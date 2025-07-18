@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(magick:*)",
+      "Bash(sudo apt:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(apt list:*)",
+      "Bash(convert:*)",
+      "Bash(rm:*)",
+      "Bash(true)",
+      "Bash(ls:*)"
+    ],
+    "deny": []
+  }
+}

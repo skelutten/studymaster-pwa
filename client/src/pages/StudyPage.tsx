@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDeckStore } from '../stores/deckStore'
+import { useGamificationStore } from '../stores/gamificationStore'
 import { Card } from '../../../shared/types'
 import CardRenderer from '../components/study/CardRenderer'
+import { useStudyKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { StudyShortcutsHelp } from '../components/study/KeyboardShortcutsHelp'
+import { CardStateIndicator } from '../components/study/CardStateIndicator'
 import '../utils/testStatsLogic'
 
 const StudyPage = () => {
@@ -21,6 +25,8 @@ const StudyPage = () => {
     getStudySession
   } = useDeckStore()
   
+  const { awardStudyXP } = useGamificationStore()
+  
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [showAnswer, setShowAnswer] = useState(false)
   const [studyCards, setStudyCards] = useState<Card[]>([])
@@ -30,7 +36,9 @@ const StudyPage = () => {
     correct: 0,
     incorrect: 0
   })
+  const [xpEarned, setXpEarned] = useState(0)
   const [sessionInitialized, setSessionInitialized] = useState(false)
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
 
   const deck = deckId ? getDeck(deckId) : null
   const allCards = deckId ? getCards(deckId) : []
@@ -77,6 +85,47 @@ const StudyPage = () => {
   }, [allCards, deckId, startStudySession, sessionInitialized])
 
   const currentCard = studyCards[currentCardIndex]
+
+  // Keyboard shortcuts integration
+  useStudyKeyboardShortcuts({
+    onFlipCard: () => {
+      if (!showAnswer && currentCard) {
+        setShowAnswer(true)
+        console.log('[Keyboard] Flipped card to show answer')
+      }
+    },
+    onAnswerAgain: () => {
+      if (showAnswer && currentCard) {
+        console.log('[Keyboard] Answered: Again')
+        handleAnswer('again')
+      }
+    },
+    onAnswerHard: () => {
+      if (showAnswer && currentCard) {
+        console.log('[Keyboard] Answered: Hard')
+        handleAnswer('hard')
+      }
+    },
+    onAnswerGood: () => {
+      if (showAnswer && currentCard) {
+        console.log('[Keyboard] Answered: Good')
+        handleAnswer('good')
+      }
+    },
+    onAnswerEasy: () => {
+      if (showAnswer && currentCard) {
+        console.log('[Keyboard] Answered: Easy')
+        handleAnswer('easy')
+      }
+    },
+    onExitStudy: () => {
+      console.log('[Keyboard] Exiting study session')
+      goBackToDecks()
+    },
+    showAnswer,
+    enabled: !sessionComplete && currentCard !== undefined,
+    debugMode: true
+  })
 
   const handleAnswer = async (difficulty: 'easy' | 'good' | 'hard' | 'again') => {
     if (!currentCard) return
@@ -180,6 +229,22 @@ const StudyPage = () => {
     // Handle session completion
     if (isLastCard) {
       setSessionComplete(true)
+      
+      // Award XP for completing the study session
+      const totalCardsStudied = sessionStats.correct + sessionStats.incorrect + 1 // +1 for current card
+      const correctAnswers = newStats.correct
+      
+      // Calculate XP earned (same formula as in gamificationStore)
+      const baseXP = totalCardsStudied // 1 XP per card studied
+      const bonusXP = correctAnswers // 1 XP per correct answer
+      const milestoneBonus = Math.floor(correctAnswers / 10) * 10 // 10 XP per 10 correct answers
+      const totalXPEarned = baseXP + bonusXP + milestoneBonus
+      
+      console.log(`🎓 Study session completed! Awarding XP for ${totalCardsStudied} cards studied, ${correctAnswers} correct answers`)
+      console.log(`🎉 XP Breakdown: ${baseXP} base + ${bonusXP} bonus + ${milestoneBonus} milestone = ${totalXPEarned} total`)
+      
+      setXpEarned(totalXPEarned)
+      awardStudyXP(totalCardsStudied, correctAnswers)
     }
 
     // Process card update asynchronously without blocking UI
@@ -193,6 +258,7 @@ const StudyPage = () => {
     setShowAnswer(false)
     setSessionComplete(false)
     setSessionStats({ total: studyCards.length, correct: 0, incorrect: 0 })
+    setXpEarned(0)
     
     // Clear existing session and start fresh
     if (deckId) {
@@ -345,6 +411,15 @@ const StudyPage = () => {
               <span>Accuracy:</span>
               <span className="font-medium">{accuracy}%</span>
             </div>
+            {xpEarned > 0 && (
+              <div className="flex justify-between border-t pt-2 bg-yellow-50 dark:bg-yellow-900/20 -mx-2 px-2 py-2 rounded">
+                <span className="flex items-center gap-1">
+                  <span>🎉</span>
+                  <span className="font-medium">XP Earned:</span>
+                </span>
+                <span className="font-bold text-yellow-600 dark:text-yellow-400">+{xpEarned} XP</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -376,6 +451,18 @@ const StudyPage = () => {
         <p className="text-gray-600 dark:text-gray-400 mb-2">
           Card {currentCardIndex + 1} of {studyCards.length}
         </p>
+        
+        {/* Card State Indicator */}
+        {currentCard && (
+          <div className="flex justify-center mb-4">
+            <CardStateIndicator
+              card={currentCard}
+              compact={true}
+              className="shadow-sm"
+            />
+          </div>
+        )}
+        
         {deckId && getStudySession(deckId) && currentCardIndex > 0 && (
           <p className="text-sm text-blue-600 dark:text-blue-400 mb-4 flex items-center justify-center gap-2">
             <span>📍</span>
@@ -404,6 +491,7 @@ const StudyPage = () => {
               className="btn btn-primary btn-lg"
             >
               Show Answer
+              <span className="ml-2 text-xs opacity-75">(Space/Enter)</span>
             </button>
           </div>
         ) : (
@@ -418,6 +506,7 @@ const StudyPage = () => {
               >
                 <div className="text-sm font-medium">Again</div>
                 <div className="text-xs opacity-80">&lt; 1 day</div>
+                <div className="text-xs opacity-60 mt-1">1 or A</div>
               </button>
               <button
                 onClick={() => handleAnswer('hard')}
@@ -425,6 +514,7 @@ const StudyPage = () => {
               >
                 <div className="text-sm font-medium">Hard</div>
                 <div className="text-xs opacity-80">1-3 days</div>
+                <div className="text-xs opacity-60 mt-1">2 or H</div>
               </button>
               <button
                 onClick={() => handleAnswer('good')}
@@ -432,6 +522,7 @@ const StudyPage = () => {
               >
                 <div className="text-sm font-medium">Good</div>
                 <div className="text-xs opacity-80">3-7 days</div>
+                <div className="text-xs opacity-60 mt-1">3 or G</div>
               </button>
               <button
                 onClick={() => handleAnswer('easy')}
@@ -439,25 +530,67 @@ const StudyPage = () => {
               >
                 <div className="text-sm font-medium">Easy</div>
                 <div className="text-xs opacity-80">1+ weeks</div>
+                <div className="text-xs opacity-60 mt-1">4 or E</div>
               </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* Keyboard Shortcuts Help */}
+      <StudyShortcutsHelp
+        showAnswer={showAnswer}
+        compact={true}
+        className="mb-4"
+      />
+
       {/* Session Stats */}
       <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
         <div>
-          Correct: <span className="text-green-600 font-medium">{sessionStats.correct}</span> | 
+          Correct: <span className="text-green-600 font-medium">{sessionStats.correct}</span> |
           Incorrect: <span className="text-red-600 font-medium">{sessionStats.incorrect}</span>
         </div>
-        <button 
-          onClick={goBackToDecks}
-          className="btn btn-secondary btn-sm"
-        >
-          Exit Study
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowShortcutsHelp(!showShortcutsHelp)}
+            className="btn btn-outline btn-sm"
+            title="Toggle keyboard shortcuts help"
+          >
+            ⌨️
+          </button>
+          <button
+            onClick={goBackToDecks}
+            className="btn btn-secondary btn-sm"
+          >
+            Exit Study
+          </button>
+        </div>
       </div>
+
+      {/* Detailed Shortcuts Help Modal */}
+      {showShortcutsHelp && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Keyboard Shortcuts</h3>
+              <button
+                onClick={() => setShowShortcutsHelp(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+            <StudyShortcutsHelp
+              showAnswer={showAnswer}
+              compact={false}
+            />
+            <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+              <p>💡 <strong>Tip:</strong> Use Space or Enter to flip cards, then 1-4 or A/H/G/E to answer!</p>
+              <p>Press Esc or Q to exit the study session anytime.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

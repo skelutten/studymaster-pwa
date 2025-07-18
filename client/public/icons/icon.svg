@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#3b82f6" stroke="#1e40af" stroke-width="8"/>
+  
+  <!-- Book/Card base -->
+  <rect x="140" y="180" width="232" height="152" rx="12" fill="#ffffff" stroke="#e5e7eb" stroke-width="3"/>
+  
+  <!-- Card lines -->
+  <line x1="160" y1="210" x2="352" y2="210" stroke="#6b7280" stroke-width="2"/>
+  <line x1="160" y1="240" x2="320" y2="240" stroke="#6b7280" stroke-width="2"/>
+  <line x1="160" y1="270" x2="340" y2="270" stroke="#6b7280" stroke-width="2"/>
+  <line x1="160" y1="300" x2="300" y2="300" stroke="#6b7280" stroke-width="2"/>
+  
+  <!-- Brain/Knowledge symbol -->
+  <g transform="translate(320, 120)">
+    <circle cx="0" cy="0" r="35" fill="#fbbf24" stroke="#f59e0b" stroke-width="3"/>
+    <path d="M-20,-10 Q-15,-20 0,-15 Q15,-20 20,-10 Q15,0 0,-5 Q-15,0 -20,-10 Z" fill="#ffffff"/>
+    <circle cx="-8" cy="-8" r="3" fill="#f59e0b"/>
+    <circle cx="8" cy="-8" r="3" fill="#f59e0b"/>
+  </g>
+  
+  <!-- Progress indicator -->
+  <rect x="140" y="350" width="232" height="8" rx="4" fill="#e5e7eb"/>
+  <rect x="140" y="350" width="140" height="8" rx="4" fill="#10b981"/>
+</svg>
