@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- Background -->
+  <rect width="96" height="96" rx="20" fill="#3b82f6"/>
+  
+  <!-- Open book -->
+  <g transform="translate(48, 48)">
+    <path d="M-20,-15 L-20,15 L-2,12 L-2,-12 Z" fill="#ffffff"/>
+    <path d="M20,-15 L20,15 L2,12 L2,-12 Z" fill="#ffffff"/>
+    <path d="M-2,-12 L2,-12 L2,12 L-2,12 Z" fill="#e5e7eb"/>
+    
+    <!-- Reading indicator -->
+    <circle cx="0" cy="-5" r="2" fill="#fbbf24"/>
+    <line x1="0" y1="-3" x2="0" y2="3" stroke="#fbbf24" stroke-width="1"/>
+  </g>
+</svg>

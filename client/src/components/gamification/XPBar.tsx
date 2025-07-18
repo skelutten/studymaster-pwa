@@ -7,15 +7,16 @@ interface XPBarProps {
 }
 
 const XPBar: React.FC<XPBarProps> = ({ currentXP, level, className = '' }) => {
-  // Calculate XP needed for current level and next level
-  const getXPForLevel = (lvl: number) => Math.floor(100 * Math.pow(1.5, lvl - 1))
+  // Calculate XP needed for current level and next level using the same formula as gamification store
+  const getXPForLevel = (lvl: number) => Math.pow(lvl - 1, 2) * 100
+  const getXPForNextLevel = (lvl: number) => Math.pow(lvl, 2) * 100
   
   const currentLevelXP = getXPForLevel(level)
-  const nextLevelXP = getXPForLevel(level + 1)
+  const nextLevelXP = getXPForNextLevel(level)
   const xpInCurrentLevel = currentXP - currentLevelXP
   const xpNeededForNextLevel = nextLevelXP - currentLevelXP
   
-  const progressPercentage = Math.min((xpInCurrentLevel / xpNeededForNextLevel) * 100, 100)
+  const progressPercentage = Math.max(0, Math.min((xpInCurrentLevel / xpNeededForNextLevel) * 100, 100))
 
   return (
     <div className={`space-y-2 ${className}`}>

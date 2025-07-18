@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDeckStore } from '../../stores/deckStore'
 import { Card } from '../../../../shared/types'
+import { createNewCard } from '../../utils/cardDefaults'
 
 interface CardManagerProps {
   deckId: string
@@ -22,12 +23,12 @@ const CardManager = ({ deckId, onClose }: CardManagerProps) => {
     if (!frontContent.trim() || !backContent.trim()) return
 
     try {
-      await addCard(deckId, {
-        frontContent: frontContent.trim(),
-        backContent: backContent.trim(),
-        cardType: { type: 'basic' },
-        mediaRefs: []
-      })
+      await addCard(deckId, createNewCard(
+        frontContent.trim(),
+        backContent.trim(),
+        { type: 'basic' },
+        []
+      ))
       setFrontContent('')
       setBackContent('')
       setShowAddCard(false)

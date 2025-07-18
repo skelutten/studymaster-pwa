@@ -67,6 +67,7 @@ interface GamificationState {
   resetAllUserData: () => void
   addCurrency: (gold: number, diamonds: number) => void
   spendCurrency: (gold: number, diamonds: number) => boolean
+  awardStudyXP: (cardsStudied: number, correctAnswers: number) => void
   
   // Monthly Challenge Management
   updateMilestoneProgress: (challengeId: string, milestoneId: string, completed: boolean) => void
@@ -713,6 +714,42 @@ export const useGamificationStore = create<GamificationState>()(
             // Add contribution tracking if needed
           }
         }))
+      },
+
+      awardStudyXP: (cardsStudied, correctAnswers) => {
+        // Award XP based on study performance
+        // Base XP: 1 XP per card studied
+        // Bonus XP: 1 additional XP per correct answer (rating higher than "Again")
+        // Milestone bonus: 10 XP for every 10 cards studied with good performance
+        
+        let xpGained = cardsStudied // Base XP
+        xpGained += correctAnswers // Bonus for correct answers
+        
+        // Milestone bonus: 10 XP for every 10 cards with good performance
+        const milestoneBonus = Math.floor(correctAnswers / 10) * 10
+        xpGained += milestoneBonus
+        
+        if (xpGained > 0) {
+          set((state) => {
+            const newXP = state.userStats.xp + xpGained
+            const newLevel = calculateLevel(newXP)
+            const newXPToNextLevel = calculateXPToNextLevel(newLevel)
+            
+            console.log(`🎉 XP Awarded: +${xpGained} XP (${cardsStudied} cards, ${correctAnswers} correct, ${milestoneBonus} milestone bonus)`)
+            console.log(`📊 Total XP: ${state.userStats.xp} → ${newXP} (Level ${state.userStats.level} → ${newLevel})`)
+            
+            return {
+              userStats: {
+                ...state.userStats,
+                xp: newXP,
+                level: newLevel,
+                xpToNextLevel: newXPToNextLevel,
+                totalCards: state.userStats.totalCards + cardsStudied,
+                cardsStudiedToday: state.userStats.cardsStudiedToday + cardsStudied
+              }
+            }
+          })
+        }
       }
     }),
     {
