@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: studymaster-postgres
+    environment:
+      POSTGRES_DB: studymaster
+      POSTGRES_USER: studymaster
+      POSTGRES_PASSWORD: studymaster123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - studymaster-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: studymaster-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - studymaster-network
+
+  # Backend API Server
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: studymaster-server
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://studymaster:studymaster123@postgres:5432/studymaster
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      CLIENT_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - studymaster-network
+    command: npm run dev
+
+  # Frontend React App
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: studymaster-client
+    environment:
+      VITE_API_URL: http://localhost:3001
+      VITE_WS_URL: ws://localhost:3001
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    depends_on:
+      - server
+    networks:
+      - studymaster-network
+    command: npm run dev
+
+  # Nginx Reverse Proxy (Optional for production-like setup)
+  nginx:
+    image: nginx:alpine
+    container_name: studymaster-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - client
+      - server
+    networks:
+      - studymaster-network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  studymaster-network:
+    driver: bridge
