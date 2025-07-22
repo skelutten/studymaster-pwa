@@ -50,5 +50,5 @@ testStatsLogic()
 
 // Make test function available globally for console testing
 if (typeof window !== 'undefined') {
-  (window as any).testStatsLogic = testStatsLogic
+  (window as Window & typeof globalThis & { testStatsLogic: typeof testStatsLogic }).testStatsLogic = testStatsLogic
 }

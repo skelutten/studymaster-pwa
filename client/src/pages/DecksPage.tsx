@@ -22,6 +22,7 @@ const DecksPage = () => {
     clearError,
     getCards,
     resetImportProgress,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     addCard
   } = useDeckStore()
 
@@ -151,7 +152,27 @@ const DecksPage = () => {
     if (!selectedMapType) return
     
     try {
-      const deck = await generateMapDeck(selectedMapType, createDeck, addCard)
+      // Create wrapper function to match expected signature
+      const createDeckWrapper = async (deckData: Record<string, unknown>) => {
+        // Convert DeckData to Deck format
+        const deckInput = {
+          userId: 'user-id', // This should be from auth context
+          title: deckData.title,
+          description: deckData.description,
+          settings: deckData.settings,
+          category: deckData.category || 'geography',
+          isPublic: deckData.isPublic,
+          cardCount: deckData.cardCount || 0
+        }
+        const result = await createDeck(deckInput)
+        // Convert back to DeckData format
+        return {
+          ...deckData,
+          id: result.id
+        }
+      }
+      
+      const deck = await generateMapDeck(selectedMapType, createDeckWrapper)
       console.log(`Successfully created ${selectedMapType} map deck:`, deck)
       setShowMapModal(false)
       setSelectedMapType('')

@@ -71,7 +71,7 @@ export class StudyQueueManager {
     const nextCardDue = this.findNextCardDue(allCards)
 
     // Estimate study time
-    const estimatedStudyTime = this.estimateStudyTime(counts, settings)
+    const estimatedStudyTime = this.estimateStudyTime(counts)
 
     const queue: StudyQueue = {
       deckId,
@@ -455,7 +455,7 @@ export class StudyQueueManager {
     return nextDue ? this.daysSinceEpochToDate(nextDue) : undefined
   }
 
-  private estimateStudyTime(counts: StudyQueue['counts'], _settings: AdvancedDeckSettings): number {
+  private estimateStudyTime(counts: StudyQueue['counts']): number {
     // Rough estimates based on card types
     const newCardTime = 30 // seconds per new card
     const learningCardTime = 15 // seconds per learning card
@@ -533,7 +533,7 @@ export class StudyQueueManager {
     return shuffled
   }
 
-  private log(message: string, data?: any): void {
+  private log(message: string, data?: Record<string, unknown>): void {
     if (this.debugMode) {
       console.log(`[StudyQueueManager] ${message}`, data || '')
     }

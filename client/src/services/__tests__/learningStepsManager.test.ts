@@ -1,5 +1,5 @@
 import { LearningStepsManager } from '../learningStepsManager'
-import { Card, CardState, ReviewRating, AdvancedDeckSettings } from '../../../../shared/types'
+import { Card, CardState, AdvancedDeckSettings } from '../../../../shared/types'
 
 describe('LearningStepsManager', () => {
   let manager: LearningStepsManager

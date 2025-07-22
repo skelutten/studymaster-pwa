@@ -268,6 +268,7 @@ describe('AnkiScheduler', () => {
     })
 
     test('should handle leech tagging action', () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const tagSettings = {
         ...settings,
         lapses: {

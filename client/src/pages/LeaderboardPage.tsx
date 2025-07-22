@@ -25,8 +25,8 @@ const LeaderboardPage = () => {
       try {
         const authenticatedUser: AuthenticatedUser = {
           ...user,
-          token: (user as any).token,
-          tokenType: (user as any).tokenType
+          token: (user as AuthenticatedUser).token,
+          tokenType: (user as AuthenticatedUser).tokenType
         }
         
         const data = await userDataService.getLeaderboardData(authenticatedUser)

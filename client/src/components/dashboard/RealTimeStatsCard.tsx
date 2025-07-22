@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRealTimeData } from '../../hooks/useRealTimeData'
 
 interface RealTimeStatsCardProps {
@@ -21,6 +21,7 @@ const RealTimeStatsCard: React.FC<RealTimeStatsCardProps> = ({
     liveMetrics,
     isLoading,
     error,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     lastUpdated,
     refresh,
     formatNumber,

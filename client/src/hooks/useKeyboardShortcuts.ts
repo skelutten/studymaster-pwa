@@ -127,7 +127,7 @@ export const useKeyboardShortcuts = ({
         console.log('[KeyboardShortcuts] Unregistered shortcuts')
       }
     }
-  }, [handleKeyDown, enabled, debugMode])
+  }, [handleKeyDown, enabled, debugMode, shortcuts])
 
   return {
     shortcuts: shortcutsRef.current,

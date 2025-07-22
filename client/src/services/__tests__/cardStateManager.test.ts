@@ -1,4 +1,4 @@
-import { CardStateManager, ValidationResult, StateTransitionResult } from '../cardStateManager'
+import { CardStateManager } from '../cardStateManager'
 import { Card, CardState, AdvancedDeckSettings } from '../../../../shared/types'
 import { LearningStepsManager } from '../learningStepsManager'
 
@@ -443,8 +443,8 @@ describe('CardStateManager', () => {
     test('should handle card with undefined fields', () => {
       const undefinedCard = {
         ...validCard,
-        factor: undefined as any,
-        reps: undefined as any
+        factor: undefined as unknown as number,
+        reps: undefined as unknown as number
       }
 
       const result = manager.validateCard(undefinedCard, settings)
@@ -457,8 +457,8 @@ describe('CardStateManager', () => {
     test('should handle card with null values', () => {
       const nullCard = {
         ...validCard,
-        id: null as any,
-        frontContent: null as any
+        id: null as unknown as string,
+        frontContent: null as unknown as string
       }
 
       const result = manager.validateCard(nullCard, settings)

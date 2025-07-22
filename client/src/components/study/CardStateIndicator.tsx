@@ -1,5 +1,13 @@
 import React from 'react'
-import { Card, CardStateUtils } from '../../../../shared/types'
+import { Card } from '../../../../shared/types'
+import {
+  getCardStateDescription,
+  getCardStateColor,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getReviewCardType,
+  getNextReviewDate,
+  getDaysOverdue
+} from '../../utils/cardStateUtils'
 
 interface CardStateIndicatorProps {
   card: Card
@@ -14,10 +22,10 @@ export const CardStateIndicator: React.FC<CardStateIndicatorProps> = ({
   showDescription = false,
   compact = false
 }) => {
-  const stateColor = CardStateUtils.getCardStateColor(card)
-  const description = CardStateUtils.getCardStateDescription(card)
-  const nextReview = CardStateUtils.getNextReviewDate(card)
-  const daysOverdue = CardStateUtils.getDaysOverdue(card)
+  const stateColor = getCardStateColor(card)
+  const description = getCardStateDescription(card)
+  const nextReview = getNextReviewDate(card)
+  const daysOverdue = getDaysOverdue(card)
 
   const getStateIcon = () => {
     switch (card.state) {

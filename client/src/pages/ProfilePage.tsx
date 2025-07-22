@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { useDeckStore } from '../stores/deckStore'
 import { useGamificationStore } from '../stores/gamificationStore'
@@ -36,7 +36,7 @@ const ProfilePage = () => {
   }, [user, isLoading, initializeAuth])
 
   // Load dynamic user data function
-  const loadUserData = async () => {
+  const loadUserData = useCallback(async () => {
     if (!user) return
     
     setDataLoading(true)
@@ -44,7 +44,7 @@ const ProfilePage = () => {
     
     try {
       // Check if user is demo user
-      const isDemo = user.email === 'demo@studymaster.com' || (user as any).tokenType === 'demo'
+      const isDemo = user.email === 'demo@studymaster.com' || (user as AuthenticatedUser).tokenType === 'demo'
       
       // Initialize gamification data based on user type
       initializeUserData(isDemo)
@@ -59,8 +59,8 @@ const ProfilePage = () => {
         // For authenticated users, try to load from API
         const authenticatedUser: AuthenticatedUser = {
           ...user,
-          token: (user as any).token,
-          tokenType: (user as any).tokenType
+          token: (user as AuthenticatedUser).token,
+          tokenType: (user as AuthenticatedUser).tokenType
         }
         
         try {
@@ -92,12 +92,12 @@ const ProfilePage = () => {
     } finally {
       setDataLoading(false)
     }
-  }
+  }, [user, initializeUserData])
 
   // Load dynamic user data when user is available
   useEffect(() => {
     loadUserData()
-  }, [user])
+  }, [loadUserData])
   
   const [editForm, setEditForm] = useState({
     username: user?.username || '',
@@ -127,14 +127,14 @@ const ProfilePage = () => {
     
     try {
       // Check if user is demo user
-      const isDemo = user.email === 'demo@studymaster.com' || (user as any).tokenType === 'demo'
+      const isDemo = user.email === 'demo@studymaster.com' || (user as AuthenticatedUser).tokenType === 'demo'
       
       if (!isDemo) {
         // For authenticated users, call API
         const authenticatedUser: AuthenticatedUser = {
           ...user,
-          token: (user as any).token,
-          tokenType: (user as any).tokenType
+          token: (user as AuthenticatedUser).token,
+          tokenType: (user as AuthenticatedUser).tokenType
         }
         
         try {
@@ -163,7 +163,7 @@ const ProfilePage = () => {
       setTimeout(async () => {
         setResetSuccess(false)
         // Reinitialize gamification data and reload user data
-        const isDemo = user.email === 'demo@studymaster.com' || (user as any).tokenType === 'demo'
+        const isDemo = user.email === 'demo@studymaster.com' || (user as AuthenticatedUser).tokenType === 'demo'
         initializeUserData(isDemo)
         await loadUserData()
       }, 1500)
