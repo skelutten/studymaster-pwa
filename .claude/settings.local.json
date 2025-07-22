@@ -25,7 +25,10 @@
       "Bash(ss:*)",
       "Bash(find:*)",
       "Bash(sed:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(supabase status:*)",
+      "Bash(curl:*)",
+      "Bash(npm start)"
     ],
     "deny": []
   }
