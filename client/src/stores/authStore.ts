@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { User } from '@shared/types'
+import type { User } from '../types'
 
 interface AuthState {
   user: User | null
@@ -64,30 +64,55 @@ export const useAuthStore = create<AuthState>()(
             return
           }
 
-          // Make API call to authenticate
-          const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-          })
-          
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => null)
-            const errorMessage = errorData?.message || 'Login failed'
-            throw new Error(errorMessage)
+          // Try API call first, fallback to local storage
+          try {
+            const response = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password })
+            })
+            
+            if (response.ok) {
+              const data = await response.json()
+              
+              if (data.success && data.user && data.token) {
+                localStorage.setItem('authToken', data.token)
+                
+                set({
+                  user: data.user,
+                  isAuthenticated: true,
+                  isLoading: false,
+                  error: null
+                })
+                return
+              }
+            }
+          } catch (apiError) {
+            // API failed, fallback to local storage
           }
           
-          const data = await response.json()
+          // Fallback to local storage authentication
+          const existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '{}')
+          const user = existingUsers[email.toLowerCase()]
           
-          if (!data.success || !data.user || !data.token) {
-            throw new Error('Invalid login response')
+          if (!user || user.password !== password) {
+            throw new Error('Invalid email or password')
           }
           
-          // Store token in localStorage
-          localStorage.setItem('authToken', data.token)
+          // Update last active time
+          user.lastActive = new Date().toISOString()
+          existingUsers[email.toLowerCase()] = user
+          localStorage.setItem('registeredUsers', JSON.stringify(existingUsers))
+          
+          // Generate token
+          const token = 'local-token-' + user.id
+          localStorage.setItem('authToken', token)
+          
+          // Remove password from user object before storing in state
+          const { password: _, ...userWithoutPassword } = user
           
           set({
-            user: data.user,
+            user: userWithoutPassword,
             isAuthenticated: true,
             isLoading: false,
             error: null
@@ -104,30 +129,57 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null })
         
         try {
-          // Make API call to register
-          const response = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, username, password })
-          })
-          
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => null)
-            const errorMessage = errorData?.message || 'Registration failed'
-            throw new Error(errorMessage)
+          // Validate inputs
+          if (!email || !password || !username) {
+            throw new Error('Email, username and password are required')
           }
           
-          const data = await response.json()
-          
-          if (!data.success || !data.user || !data.token) {
-            throw new Error('Invalid registration response')
+          if (password.length < 4) {
+            throw new Error('Password must be at least 4 characters long')
           }
           
-          // Store token in localStorage
-          localStorage.setItem('authToken', data.token)
+          // Get existing users from localStorage
+          const existingUsers = JSON.parse(localStorage.getItem('registeredUsers') || '{}')
+          
+          // Check if user already exists
+          if (existingUsers[email.toLowerCase()]) {
+            throw new Error('User with this email already exists')
+          }
+          
+          // Create new user
+          const newUser = {
+            id: Date.now().toString(),
+            email: email.toLowerCase(),
+            username,
+            level: 1,
+            totalXp: 0,
+            coins: 100,
+            gems: 10,
+            createdAt: new Date().toISOString(),
+            lastActive: new Date().toISOString(),
+            preferences: {
+              theme: 'system' as const,
+              language: 'en',
+              notifications: true,
+              soundEffects: true,
+              dailyGoal: 50,
+              timezone: 'UTC'
+            }
+          }
+          
+          // Store user credentials and data
+          existingUsers[email.toLowerCase()] = {
+            ...newUser,
+            password // In a real app, this would be hashed
+          }
+          localStorage.setItem('registeredUsers', JSON.stringify(existingUsers))
+          
+          // Generate token
+          const token = 'local-token-' + newUser.id
+          localStorage.setItem('authToken', token)
           
           set({
-            user: data.user,
+            user: newUser,
             isAuthenticated: true,
             isLoading: false,
             error: null
@@ -170,7 +222,7 @@ export const useAuthStore = create<AuthState>()(
         }
         
         if (token) {
-          // Check if it's a demo token or mock token
+          // Check if it's a demo token
           if (token === 'demo-token') {
             set({
               isAuthenticated: true,
@@ -194,8 +246,8 @@ export const useAuthStore = create<AuthState>()(
                 }
               }
             })
-          } else if (token.startsWith('mock-token-')) {
-            // For mock tokens, we should have the user data in persist storage
+          } else if (token.startsWith('local-token-') || token.startsWith('mock-token-')) {
+            // For local or mock tokens, we should have the user data in persist storage
             // If not, we'll need to clear the token as it's invalid
             if (!user) {
               localStorage.removeItem('authToken')
