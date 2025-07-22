@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAuthStore } from '../../stores/authStore'
+import { useSupabaseAuthStore } from '../../stores/supabaseAuthStore'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -12,16 +12,16 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const { login, register, isLoading, error } = useAuthStore()
+  const { signIn, signUp, isLoading, error } = useSupabaseAuthStore()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     try {
       if (mode === 'login') {
-        await login(email, password)
+        await signIn(email, password)
       } else {
-        await register(email, username, password)
+        await signUp(email, password, username)
       }
       onClose()
       // Reset form
@@ -36,7 +36,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
   const handleDemoLogin = async () => {
     try {
       // Use demo credentials that trigger the bypass logic
-      await login('demo', '')
+      await signIn('demo', '')
       onClose()
     } catch (error) {
       // Error is handled by the store
