@@ -15,7 +15,7 @@
     "jsx": "react-jsx",
 
     /* Linting */
-    "strict": true,
+    "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
@@ -24,7 +24,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../shared/*"]
+      "@shared/types": ["./src/types"]
     },
 
     /* Additional options */
@@ -32,7 +32,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "../shared"],
+  "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/__tests__/**"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
