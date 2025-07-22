@@ -22,27 +22,92 @@ interface AuthState {
 
 // Helper function to convert Supabase user to our User type
 const convertSupabaseUser = async (supabaseUser: SupabaseUser): Promise<User> => {
-  // First check if profile exists
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', supabaseUser.id)
-    .single()
+  try {
+    // First check if profile exists
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', supabaseUser.id)
+      .single()
 
-  if (error || !profile) {
-    // Create default profile if it doesn't exist
-    const defaultProfile = {
+    if (error || !profile) {
+      console.warn('Profile not found, creating default profile:', error?.message)
+      
+      // Create default profile if it doesn't exist
+      const defaultProfile = {
+        id: supabaseUser.id,
+        email: supabaseUser.email!,
+        username: supabaseUser.user_metadata?.username || supabaseUser.email!.split('@')[0],
+        level: 1,
+        total_xp: 0,
+        coins: 100,
+        gems: 10,
+        created_at: new Date().toISOString(),
+        last_active: new Date().toISOString(),
+        preferences: {
+          theme: 'system' as const,
+          language: 'en',
+          notifications: true,
+          soundEffects: true,
+          dailyGoal: 50,
+          timezone: 'UTC'
+        }
+      }
+
+      // Try to create profile, but don't fail if table doesn't exist
+      try {
+        await supabase
+          .from('profiles')
+          .insert([defaultProfile])
+          .select()
+          .single()
+      } catch (insertError) {
+        console.warn('Could not create profile in database:', insertError)
+        // Continue with default profile even if database insert fails
+      }
+
+      return {
+        id: supabaseUser.id,
+        email: supabaseUser.email!,
+        username: defaultProfile.username,
+        level: defaultProfile.level,
+        totalXp: defaultProfile.total_xp,
+        coins: defaultProfile.coins,
+        gems: defaultProfile.gems,
+        createdAt: defaultProfile.created_at,
+        lastActive: defaultProfile.last_active,
+        preferences: defaultProfile.preferences
+      }
+    }
+
+    return {
+      id: profile.id,
+      email: profile.email,
+      username: profile.username,
+      level: profile.level,
+      totalXp: profile.total_xp,
+      coins: profile.coins,
+      gems: profile.gems,
+      createdAt: profile.created_at,
+      lastActive: profile.last_active,
+      preferences: profile.preferences
+    }
+  } catch (error) {
+    console.error('Error in convertSupabaseUser:', error)
+    
+    // Fallback: create a basic user object from Supabase user data
+    return {
       id: supabaseUser.id,
       email: supabaseUser.email!,
       username: supabaseUser.user_metadata?.username || supabaseUser.email!.split('@')[0],
       level: 1,
-      total_xp: 0,
+      totalXp: 0,
       coins: 100,
       gems: 10,
-      created_at: new Date().toISOString(),
-      last_active: new Date().toISOString(),
+      createdAt: supabaseUser.created_at,
+      lastActive: new Date().toISOString(),
       preferences: {
-        theme: 'system' as const,
+        theme: 'system',
         language: 'en',
         notifications: true,
         soundEffects: true,
@@ -50,38 +115,6 @@ const convertSupabaseUser = async (supabaseUser: SupabaseUser): Promise<User> =>
         timezone: 'UTC'
       }
     }
-
-    const { data: newProfile } = await supabase
-      .from('profiles')
-      .insert([defaultProfile])
-      .select()
-      .single()
-
-    return {
-      id: supabaseUser.id,
-      email: supabaseUser.email!,
-      username: defaultProfile.username,
-      level: defaultProfile.level,
-      totalXp: defaultProfile.total_xp,
-      coins: defaultProfile.coins,
-      gems: defaultProfile.gems,
-      createdAt: defaultProfile.created_at,
-      lastActive: defaultProfile.last_active,
-      preferences: defaultProfile.preferences
-    }
-  }
-
-  return {
-    id: profile.id,
-    email: profile.email,
-    username: profile.username,
-    level: profile.level,
-    totalXp: profile.total_xp,
-    coins: profile.coins,
-    gems: profile.gems,
-    createdAt: profile.created_at,
-    lastActive: profile.last_active,
-    preferences: profile.preferences
   }
 }
 
@@ -144,9 +177,20 @@ export const useSupabaseAuthStore = create<AuthState>()((set, get) => ({
   signIn: async (email: string, password: string) => {
     set({ isLoading: true, error: null })
     
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      set({ 
+        isLoading: false, 
+        error: 'Login timed out. Please try again.' 
+      })
+    }, 10000) // 10 second timeout
+    
     try {
+      console.log('Starting signIn process for:', email)
+      
       // Check for demo login
       if (email === 'demo' || email === '') {
+        console.log('Demo login detected')
         // Demo user - create temporary session
         const demoUser: User = {
           id: 'demo-user',
@@ -168,6 +212,7 @@ export const useSupabaseAuthStore = create<AuthState>()((set, get) => ({
           }
         }
         
+        clearTimeout(timeoutId)
         set({
           user: demoUser,
           session: null,
@@ -178,22 +223,36 @@ export const useSupabaseAuthStore = create<AuthState>()((set, get) => ({
         return
       }
 
+      console.log('Attempting Supabase signIn...')
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase auth error:', error)
+        throw error
+      }
+
+      console.log('Supabase signIn successful, data:', { user: !!data.user, session: !!data.session })
 
       if (data.user && data.session) {
+        console.log('Converting user profile...')
         const user = await convertSupabaseUser(data.user)
+        console.log('User profile converted:', user)
         
-        // Update last active time
-        await supabase
-          .from('profiles')
-          .update({ last_active: new Date().toISOString() })
-          .eq('id', data.user.id)
+        // Try to update last active time, but don't fail if it doesn't work
+        try {
+          await supabase
+            .from('profiles')
+            .update({ last_active: new Date().toISOString() })
+            .eq('id', data.user.id)
+        } catch (updateError) {
+          console.warn('Could not update last active time:', updateError)
+        }
         
+        console.log('Setting authenticated state...')
+        clearTimeout(timeoutId)
         set({
           user,
           session: data.session,
@@ -201,8 +260,18 @@ export const useSupabaseAuthStore = create<AuthState>()((set, get) => ({
           isLoading: false,
           error: null
         })
+        console.log('SignIn completed successfully')
+      } else {
+        console.warn('No user or session in response')
+        clearTimeout(timeoutId)
+        set({
+          error: 'Invalid login response - no user or session',
+          isLoading: false
+        })
       }
     } catch (error) {
+      console.error('SignIn error:', error)
+      clearTimeout(timeoutId)
       set({
         error: error instanceof Error ? error.message : 'Login failed',
         isLoading: false
@@ -307,8 +376,6 @@ export const useSupabaseAuthStore = create<AuthState>()((set, get) => ({
 
 // Set up auth state change listener
 supabase.auth.onAuthStateChange(async (event, session) => {
-  const store = useSupabaseAuthStore.getState()
-  
   if (event === 'SIGNED_IN' && session?.user) {
     const user = await convertSupabaseUser(session.user)
     useSupabaseAuthStore.setState({

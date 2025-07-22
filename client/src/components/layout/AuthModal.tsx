@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSupabaseAuthStore } from '../../stores/supabaseAuthStore'
 
 interface AuthModalProps {
@@ -12,7 +12,23 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const { signIn, signUp, isLoading, error } = useSupabaseAuthStore()
+  const { signIn, signUp, isLoading, error, clearError } = useSupabaseAuthStore()
+
+  // Clear errors when modal opens or mode changes
+  useEffect(() => {
+    if (isOpen) {
+      clearError()
+    }
+  }, [isOpen, clearError])
+
+  useEffect(() => {
+    clearError()
+  }, [mode, clearError])
+
+  const handleModeChange = (newMode: 'login' | 'register') => {
+    clearError()
+    onModeChange(newMode)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,7 +139,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
                   <span>
                     Don't have an account?{' '}
                     <button
-                      onClick={() => onModeChange('register')}
+                      onClick={() => handleModeChange('register')}
                       className="text-blue-600 hover:text-blue-500"
                     >
                       Create one
@@ -133,7 +149,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
                   <span>
                     Already have an account?{' '}
                     <button
-                      onClick={() => onModeChange('login')}
+                      onClick={() => handleModeChange('login')}
                       className="text-blue-600 hover:text-blue-500"
                     >
                       Sign in

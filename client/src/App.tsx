@@ -20,7 +20,7 @@ function App() {
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false)
 
   const {
-    needRefresh: [needRefresh, setNeedRefresh],
+    needRefresh: [, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r: ServiceWorkerRegistration | undefined) {

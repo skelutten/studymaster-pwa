@@ -109,7 +109,7 @@ export const useAuthStore = create<AuthState>()(
           localStorage.setItem('authToken', token)
           
           // Remove password from user object before storing in state
-          const { password: _, ...userWithoutPassword } = user
+          const { ...userWithoutPassword } = user
           
           set({
             user: userWithoutPassword,
