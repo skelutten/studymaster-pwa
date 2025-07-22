@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDeckStore } from '../stores/deckStore'
-import { Deck } from '../../../shared/types'
+import { Deck, DeckSettings } from '../../../shared/types'
 import CardManager from '../components/deck/CardManager'
 import ProgressBar from '../components/ui/ProgressBar'
 import { generateMapDeck, availableMaps } from '../utils/svgMapGenerator'
@@ -153,10 +153,10 @@ const DecksPage = () => {
     
     try {
       // Create wrapper function to match expected signature
-      const createDeckWrapper = async (deckData: Record<string, unknown>) => {
+      const createDeckWrapper = async (deckData: { userId: string; title: string; description: string; settings: DeckSettings; category?: string; isPublic: boolean; cardCount?: number }) => {
         // Convert DeckData to Deck format
         const deckInput = {
-          userId: 'user-id', // This should be from auth context
+          userId: deckData.userId,
           title: deckData.title,
           description: deckData.description,
           settings: deckData.settings,
@@ -172,7 +172,8 @@ const DecksPage = () => {
         }
       }
       
-      const deck = await generateMapDeck(selectedMapType, createDeckWrapper)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const deck = await generateMapDeck(selectedMapType, createDeckWrapper as any)
       console.log(`Successfully created ${selectedMapType} map deck:`, deck)
       setShowMapModal(false)
       setSelectedMapType('')
