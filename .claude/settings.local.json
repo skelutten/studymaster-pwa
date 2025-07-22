@@ -8,7 +8,13 @@
       "Bash(convert:*)",
       "Bash(rm:*)",
       "Bash(true)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm run lint)",
+      "Bash(npx eslint:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

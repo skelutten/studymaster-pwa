@@ -1,4 +1,5 @@
-import { Card, SvgMapCardOptions } from '../../../shared/types';
+import { Card, SvgMapCardOptions, CardType } from '../../../shared/types';
+import { createSvgMapCard } from './cardDefaults';
 
 // Extract country data from Europe SVG
 export const europeCountries = [
@@ -650,23 +651,17 @@ export function generateSvgMapCards(
       svgPath: mapConfig.svgPath
     };
 
-    const card: Card = {
-      id: `${deckId}_${mapConfig.mapId}_${country.id}`,
-      deckId: deckId,
-      frontContent: `Identify the highlighted region in ${mapConfig.mapName}`,
-      backContent: country.name,
-      cardType: {
+    const card = createSvgMapCard(
+      `${deckId}_${mapConfig.mapId}_${country.id}`,
+      deckId,
+      `Identify the highlighted region in ${mapConfig.mapName}`,
+      country.name,
+      {
         type: 'svg_map',
         options: cardOptions
       },
-      mediaRefs: [],
-      easeFactor: 2.5,
-      intervalDays: 1,
-      nextReview: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      reviewCount: 0,
-      lapseCount: 0
-    };
+      []
+    );
 
     cards.push(card);
   });
@@ -708,7 +703,25 @@ export function getCountryInfo(mapId: string, countryId: string): { id: string; 
 /**
  * Generate a complete map deck for any available map
  */
-export async function generateMapDeck(mapId: string, createDeck: any, addCard?: any) {
+interface DeckData {
+  id?: string;
+  userId: string;
+  title: string;
+  description: string;
+  cardCount: number;
+  isPublic: boolean;
+  category?: string;
+  settings: Record<string, unknown>;
+}
+
+interface CardData {
+  frontContent: string;
+  backContent: string;
+  cardType: CardType;
+  options?: Record<string, unknown>;
+}
+
+export async function generateMapDeck(mapId: string, createDeck: (deckData: DeckData) => Promise<DeckData>, addCard?: (cardData: CardData) => Promise<CardData>) {
   const mapConfig = getMapConfig(mapId);
   if (!mapConfig) {
     throw new Error(`Map configuration for '${mapId}' not found`);
@@ -736,14 +749,11 @@ export async function generateMapDeck(mapId: string, createDeck: any, addCard?: 
   if (addCard && deck.id) {
     const cards = generateSvgMapCards(deck.id, mapConfig);
     
-    // Add cards one by one
-    for (const card of cards) {
-      await addCard(deck.id, {
-        frontContent: card.frontContent,
-        backContent: card.backContent,
-        cardType: card.cardType,
-        mediaRefs: card.mediaRefs
-      });
+    // Add cards one by one if addCard function is provided
+    if (addCard) {
+      for (const card of cards) {
+        await addCard(card);
+      }
     }
   }
 
@@ -753,6 +763,6 @@ export async function generateMapDeck(mapId: string, createDeck: any, addCard?: 
 /**
  * Generate a complete Europe map deck (backward compatibility)
  */
-export async function generateEuropeMapDeck(createDeck: any, addCard?: any) {
+export async function generateEuropeMapDeck(createDeck: (deckData: DeckData) => Promise<DeckData>, addCard?: (cardData: CardData) => Promise<CardData>) {
   return generateMapDeck('europe', createDeck, addCard);
 }

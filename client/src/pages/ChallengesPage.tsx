@@ -26,8 +26,8 @@ const ChallengesPage: React.FC = () => {
       try {
         const authenticatedUser: AuthenticatedUser = {
           ...user,
-          token: (user as any).token,
-          tokenType: (user as any).tokenType
+          token: (user as AuthenticatedUser).token,
+          tokenType: (user as AuthenticatedUser).tokenType
         }
         
         const challenges = await userDataService.getUserChallenges(authenticatedUser)
@@ -67,14 +67,16 @@ const ChallengesPage: React.FC = () => {
       switch (sortBy) {
         case 'expiresAt':
           return new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime()
-        case 'reward':
+        case 'reward': {
           const aRewardValue = a.reward.xp + a.reward.coins + (a.reward.gems || 0) * 10
           const bRewardValue = b.reward.xp + b.reward.coins + (b.reward.gems || 0) * 10
           return bRewardValue - aRewardValue
-        case 'progress':
+        }
+        case 'progress': {
           const aProgress = (a.current / a.target) * 100
           const bProgress = (b.current / b.target) * 100
           return bProgress - aProgress
+        }
         default:
           return 0
       }

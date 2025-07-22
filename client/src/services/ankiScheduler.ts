@@ -115,17 +115,17 @@ export class AnkiScheduler {
 
     const previousInterval = card.ivl
     const previousEase = card.factor
-    let newCard = { ...card }
-    let wasCorrect = rating >= 3 // Good or Easy
+    const newCard = { ...card }
+    const wasCorrect = rating >= 3 // Good or Easy
     let reasoning = ''
 
     // Handle lapse (Again or Hard with specific conditions)
-    if (rating === 1 || (rating === 2 && this.shouldLapse(card, settings))) {
+    if (rating === 1 || (rating === 2 && this.shouldLapse(card))) {
       return this.handleReviewLapse(newCard, rating, settings, context)
     }
 
     // Calculate new ease factor
-    const easeChange = this.calculateEaseChange(rating, settings)
+    const easeChange = this.calculateEaseChange(rating)
     newCard.factor = Math.max(1300, Math.min(5000, card.factor + easeChange))
 
     // Calculate new interval
@@ -190,7 +190,7 @@ export class AnkiScheduler {
       lapses: card.lapses
     })
 
-    let newCard = { ...card }
+    const newCard = { ...card }
     newCard.lapses += 1
 
     // Reduce ease factor for lapses
@@ -257,7 +257,7 @@ export class AnkiScheduler {
   /**
    * Determine if a Hard rating should cause a lapse
    */
-  private shouldLapse(card: Card, _settings: AdvancedDeckSettings): boolean {
+  private shouldLapse(card: Card): boolean {
     // Hard causes lapse if interval is very short or card has many lapses
     return card.ivl <= 7 || card.lapses >= 3
   }
@@ -265,7 +265,7 @@ export class AnkiScheduler {
   /**
    * Calculate ease factor change based on rating
    */
-  private calculateEaseChange(rating: ReviewRating, _settings: AdvancedDeckSettings): number {
+  private calculateEaseChange(rating: ReviewRating): number {
     switch (rating) {
       case 1: return -200 // Again: -20%
       case 2: return -150 // Hard: -15%
@@ -384,7 +384,12 @@ export class AnkiScheduler {
     card: Card,
     settings: AdvancedDeckSettings
   ): Record<ReviewRating, { interval: number; ease: number; nextReview: Date }> {
-    const preview: Record<ReviewRating, { interval: number; ease: number; nextReview: Date }> = {} as any
+    const preview: Record<ReviewRating, { interval: number; ease: number; nextReview: Date }> = {
+      1: { interval: 0, ease: 0, nextReview: new Date() },
+      2: { interval: 0, ease: 0, nextReview: new Date() },
+      3: { interval: 0, ease: 0, nextReview: new Date() },
+      4: { interval: 0, ease: 0, nextReview: new Date() }
+    }
 
     for (let rating = 1; rating <= 4; rating++) {
       try {
@@ -499,7 +504,7 @@ export class AnkiScheduler {
     return new Date(days * 24 * 60 * 60 * 1000)
   }
 
-  private log(message: string, data?: any): void {
+  private log(message: string, data?: Record<string, unknown>): void {
     if (this.debugMode) {
       console.log(`[AnkiScheduler] ${message}`, data || '')
     }

@@ -1,5 +1,4 @@
-import { useDeckStore } from '../stores/deckStore'
-import { useGamificationStore } from '../stores/gamificationStore'
+// Removed unused imports: useDeckStore and useGamificationStore
 
 // Types for real-time data
 export interface GlobalLearningStats {
@@ -41,20 +40,20 @@ export interface MarketInsights {
 // Real-time data service class
 export class RealTimeDataService {
   private updateInterval: number = 30000 // 30 seconds
-  private subscribers: Map<string, Function[]> = new Map()
+  private subscribers: Map<string, ((data: unknown) => void)[]> = new Map()
 
   // Subscribe to real-time updates
-  subscribe(dataType: string, callback: Function): () => void {
+  subscribe<T = unknown>(dataType: string, callback: (data: T) => void): () => void {
     if (!this.subscribers.has(dataType)) {
       this.subscribers.set(dataType, [])
     }
-    this.subscribers.get(dataType)!.push(callback)
+    this.subscribers.get(dataType)!.push(callback as (data: unknown) => void)
 
     // Return unsubscribe function
     return () => {
       const callbacks = this.subscribers.get(dataType)
       if (callbacks) {
-        const index = callbacks.indexOf(callback)
+        const index = callbacks.indexOf(callback as (data: unknown) => void)
         if (index > -1) {
           callbacks.splice(index, 1)
         }
@@ -63,7 +62,7 @@ export class RealTimeDataService {
   }
 
   // Notify subscribers
-  private notify(dataType: string, data: any): void {
+  private notify(dataType: string, data: unknown): void {
     const callbacks = this.subscribers.get(dataType)
     if (callbacks) {
       callbacks.forEach(callback => callback(data))
@@ -83,7 +82,7 @@ export class RealTimeDataService {
 
       if (stats) {
         this.notify('globalStats', stats)
-        return stats
+        return stats as GlobalLearningStats
       }
     } catch (error) {
       console.warn('Failed to fetch real global stats, using enhanced mock data:', error)
@@ -152,7 +151,8 @@ export class RealTimeDataService {
       })
       
       if (response.ok) {
-        const data = await response.json()
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _data = await response.json()
         // Extract relevant statistics if available
         return null // Placeholder
       }
@@ -199,13 +199,13 @@ export class RealTimeDataService {
   }
 
   // Fetch from multiple sources and combine results
-  private async fetchFromMultipleSources(fetchers: Array<() => Promise<any>>): Promise<any> {
+  private async fetchFromMultipleSources(fetchers: Array<() => Promise<unknown>>): Promise<unknown> {
     const results = await Promise.allSettled(fetchers.map(fetcher => fetcher()))
     
     // Combine successful results
     const successfulResults = results
       .filter(result => result.status === 'fulfilled' && result.value)
-      .map(result => (result as PromiseFulfilledResult<any>).value)
+      .map(result => (result as PromiseFulfilledResult<unknown>).value)
 
     if (successfulResults.length > 0) {
       // Merge results from multiple sources
@@ -216,7 +216,7 @@ export class RealTimeDataService {
   }
 
   // Merge data from multiple sources
-  private mergeDataSources(sources: any[]): any {
+  private mergeDataSources(sources: unknown[]): unknown {
     // Implement logic to combine data from multiple sources
     // For now, return the first successful source
     return sources[0]

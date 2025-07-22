@@ -388,7 +388,7 @@ export class LearningStepsManager {
   /**
    * Debug logging
    */
-  private log(message: string, data?: any): void {
+  private log(message: string, data?: Record<string, unknown>): void {
     if (this.debugMode) {
       console.log(`[LearningStepsManager] ${message}`, data || '')
     }

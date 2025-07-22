@@ -7,6 +7,7 @@ const HomePage = () => {
   const navigate = useNavigate()
   const { decks, getCards } = useDeckStore()
   const { userStats, userAchievements, achievements } = useGamificationStore()
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user } = useAuthStore()
 
   // Get due cards for today

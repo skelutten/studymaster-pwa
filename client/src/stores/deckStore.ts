@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Deck, Card, DeckSettings } from '../../../shared/types'
+import { createNewCard } from '../utils/cardDefaults'
 import JSZip from 'jszip'
 import initSqlJs from 'sql.js'
 
@@ -300,7 +301,8 @@ export const useDeckStore = create<DeckStore>()(
         set({ isLoading: true, error: null })
         try {
           set(state => {
-            const { [id]: deletedCards, ...remainingCards } = state.cards
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { [id]: _deletedCards, ...remainingCards } = state.cards
             return {
               decks: state.decks.filter(deck => deck.id !== id),
               cards: remainingCards,
@@ -599,12 +601,12 @@ export const useDeckStore = create<DeckStore>()(
             
             for (let i = 0; i < totalCards; i += batchSize) {
               const batch = uniqueCards.slice(i, i + batchSize)
-              const batchCards = batch.map(cardData => ({
-                frontContent: cardData.front,
-                backContent: cardData.back,
-                cardType: { type: 'basic' as const },
-                mediaRefs: []
-              }))
+              const batchCards = batch.map(cardData => createNewCard(
+                cardData.front,
+                cardData.back,
+                { type: 'basic' as const },
+                []
+              ))
               
               try {
                 console.log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(totalCards / batchSize)} (${batch.length} cards)`)
@@ -624,12 +626,12 @@ export const useDeckStore = create<DeckStore>()(
                 // Try individual cards in this batch as fallback
                 for (const originalCard of batch) {
                   try {
-                    await get().addCardBulk(deck.id, {
-                      frontContent: originalCard.front,
-                      backContent: originalCard.back,
-                      cardType: { type: 'basic' as const },
-                      mediaRefs: []
-                    })
+                    await get().addCardBulk(deck.id, createNewCard(
+                      originalCard.front,
+                      originalCard.back,
+                      { type: 'basic' as const },
+                      []
+                    ))
                     successfulImports++
                   } catch (individualError) {
                     console.warn('Failed to import individual card:', originalCard, individualError)
@@ -727,8 +729,8 @@ export const useDeckStore = create<DeckStore>()(
           const cleanText = text
             .replace(/\r\n/g, '\n')  // Normalize Windows line endings
             .replace(/\r/g, '\n')    // Handle old Mac line endings
-            .replace(/\u0000/g, '')  // Remove null characters
-            .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '') // Remove control characters
+            .replace(/\\u0000/g, '')  // Remove null characters
+            .replace(/[\\u0001-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]/g, '') // Remove control characters
             .trim()
           
           const lines = cleanText
@@ -755,7 +757,7 @@ export const useDeckStore = create<DeckStore>()(
           setImportProgress(50, `Importing ${lines.length} cards...`)
           
           // Process lines and prepare cards for batch import
-          const validCards: Array<{ frontContent: string; backContent: string; cardType: { type: 'basic' }; mediaRefs: [] }> = []
+          const validCards: Array<Omit<Card, 'id' | 'createdAt' | 'deckId' | 'easeFactor' | 'intervalDays' | 'nextReview' | 'reviewCount' | 'lapseCount'>> = []
           let skippedLines = 0
           
           // First pass: parse and validate all lines
@@ -779,12 +781,12 @@ export const useDeckStore = create<DeckStore>()(
                 
                 // Skip empty cards
                 if (front && back) {
-                  validCards.push({
-                    frontContent: front,
-                    backContent: back,
-                    cardType: { type: 'basic' as const },
-                    mediaRefs: []
-                  })
+                  validCards.push(createNewCard(
+                    front,
+                    back,
+                    { type: 'basic' as const },
+                    []
+                  ))
                 } else {
                   skippedLines++
                 }
@@ -961,12 +963,12 @@ export const useDeckStore = create<DeckStore>()(
             })
 
             for (const cardData of deckData.cards) {
-              await get().addCard(deck.id, {
-                frontContent: cardData.front,
-                backContent: cardData.back,
-                cardType: { type: 'basic' },
-                mediaRefs: []
-              })
+              await get().addCard(deck.id, createNewCard(
+                cardData.front,
+                cardData.back,
+                { type: 'basic' },
+                []
+              ))
             }
           }
 

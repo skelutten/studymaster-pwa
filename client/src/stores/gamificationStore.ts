@@ -401,13 +401,14 @@ export const useGamificationStore = create<GamificationState>()(
         if (challenge && participation && participation.completed) {
           // Calculate total XP and coins from rewards
           let xpGained = 0
-          let coinsGained = 0
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          let _coinsGained = 0
           
           challenge.rewards.forEach(reward => {
             if (reward.type === 'xp' && reward.amount) {
               xpGained += reward.amount
             } else if (reward.type === 'coins' && reward.amount) {
-              coinsGained += reward.amount
+              _coinsGained += reward.amount
             }
           })
           

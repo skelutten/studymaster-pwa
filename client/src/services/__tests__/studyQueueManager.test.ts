@@ -493,7 +493,7 @@ describe('StudyQueueManager', () => {
 
     test('should handle cards with invalid states', () => {
       const invalidCards = [
-        { ...mockCards[0], state: 'invalid' as any }
+        { ...mockCards[0], state: 'invalid' as unknown as CardState }
       ]
       
       expect(() => {

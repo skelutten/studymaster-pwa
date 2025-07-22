@@ -62,9 +62,19 @@ export const SvgMapCard: React.FC<SvgMapCardProps> = ({
   const [initialZoomCalculated, setInitialZoomCalculated] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
+  const loadSvgContent = useCallback(async () => {
+    try {
+      const response = await fetch(options.svgPath);
+      const svgText = await response.text();
+      setSvgContent(svgText);
+    } catch (error) {
+      console.error('Failed to load SVG:', error);
+    }
+  }, [options.svgPath]);
+
   useEffect(() => {
     loadSvgContent();
-  }, [options.svgPath]);
+  }, [loadSvgContent]);
 
   // Reset input and result state when country changes
   useEffect(() => {
@@ -237,16 +247,6 @@ export const SvgMapCard: React.FC<SvgMapCardProps> = ({
     setIsDragging(false);
   }, []);
 
-  const loadSvgContent = async () => {
-    try {
-      const response = await fetch(options.svgPath);
-      const svgText = await response.text();
-      setSvgContent(svgText);
-    } catch (error) {
-      console.error('Failed to load SVG:', error);
-    }
-  };
-
   // Get map type from SVG path
   const getMapType = (svgPath: string): string => {
     const filename = svgPath.split('/').pop()?.replace('.svg', '') || '';
@@ -254,6 +254,7 @@ export const SvgMapCard: React.FC<SvgMapCardProps> = ({
   };
 
   // Improved positioning coordinates for small countries/regions based on actual SVG coordinates
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const getSmallRegionIndicatorPosition = (countryId: string, mapType: string) => {
     // Position data organized by map type
     const positionsByMap: { [mapType: string]: { [regionId: string]: { x: number; y: number; offsetX: number; offsetY: number } } } = {
@@ -344,6 +345,7 @@ export const SvgMapCard: React.FC<SvgMapCardProps> = ({
     
     // Determine if this is a small region that needs an indicator
     const smallRegions = SMALL_REGIONS_BY_MAP[mapType] || [];
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const isSmallRegion = smallRegions.includes(options.countryId);
     
     if (targetCountry) {

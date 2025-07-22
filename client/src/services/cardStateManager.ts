@@ -1,4 +1,4 @@
-import { Card, CardState, AdvancedDeckSettings, CardMigrationData } from '../../../shared/types'
+import { Card, CardState, AdvancedDeckSettings, CardMigrationData, CardType } from '../../../shared/types'
 
 /**
  * Card State Manager
@@ -246,7 +246,7 @@ export class CardStateManager {
         updatedCard.left = 0
         break
 
-      case 'buried':
+      case 'buried': {
         updatedCard.originalDue = updatedCard.due
         // Set due to tomorrow
         const tomorrow = new Date()
@@ -254,6 +254,7 @@ export class CardStateManager {
         updatedCard.due = this.dateToDaysSinceEpoch(tomorrow)
         updatedCard.left = 0
         break
+      }
     }
 
     // Validate updated card
@@ -281,11 +282,11 @@ export class CardStateManager {
   /**
    * Migrate a card from legacy format to enhanced format
    */
-  migrateCard(legacyCard: any, settings?: AdvancedDeckSettings): StateTransitionResult {
+  migrateCard(legacyCard: Partial<Card>, settings?: AdvancedDeckSettings): StateTransitionResult {
     this.log('Migrating legacy card', { cardId: legacyCard.id })
 
     const migrationData: CardMigrationData = {
-      cardId: legacyCard.id,
+      cardId: legacyCard.id || '',
       migratedAt: new Date().toISOString(),
       oldFormat: {
         easeFactor: legacyCard.easeFactor || 2.5,
@@ -315,12 +316,12 @@ export class CardStateManager {
     let newLapses = 0
     let newDue = 0
 
-    if (legacyCard.reviewCount > 0) {
+    if ((legacyCard.reviewCount || 0) > 0) {
       newState = 'review'
       newQueue = 2
       newIvl = Math.max(1, legacyCard.intervalDays || 1)
       newFactor = Math.round((legacyCard.easeFactor || 2.5) * 1000)
-      newReps = legacyCard.reviewCount
+      newReps = legacyCard.reviewCount || 0
       newLapses = legacyCard.lapseCount || 0
       
       // Calculate due date
@@ -335,11 +336,11 @@ export class CardStateManager {
     // Create enhanced card
     const enhancedCard: Card = {
       // Copy existing fields
-      id: legacyCard.id,
-      deckId: legacyCard.deckId,
-      frontContent: legacyCard.frontContent,
-      backContent: legacyCard.backContent,
-      cardType: legacyCard.cardType,
+      id: legacyCard.id || '',
+      deckId: legacyCard.deckId || '',
+      frontContent: legacyCard.frontContent || '',
+      backContent: legacyCard.backContent || '',
+      cardType: (legacyCard.cardType as CardType) || 'basic',
       mediaRefs: legacyCard.mediaRefs || [],
       
       // Legacy fields (for backward compatibility)
@@ -366,7 +367,7 @@ export class CardStateManager {
       averageAnswerTime: 0,
       flags: 0,
       originalDue: 0,
-      originalDeck: legacyCard.deckId,
+      originalDeck: legacyCard.deckId || '',
       xpAwarded: 0,
       difficultyRating: 3
     }
@@ -546,7 +547,7 @@ export class CardStateManager {
   /**
    * Debug logging
    */
-  private log(message: string, data?: any): void {
+  private log(message: string, data?: Record<string, unknown>): void {
     if (this.debugMode) {
       console.log(`[CardStateManager] ${message}`, data || '')
     }
@@ -566,7 +567,7 @@ export class CardStateManager {
     }
 
     for (const card of cards) {
-      if (stats.hasOwnProperty(card.state)) {
+      if (Object.prototype.hasOwnProperty.call(stats, card.state)) {
         stats[card.state]++
       }
     }

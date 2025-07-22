@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { flushSync } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDeckStore } from '../stores/deckStore'
@@ -41,7 +41,7 @@ const StudyPage = () => {
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
 
   const deck = deckId ? getDeck(deckId) : null
-  const allCards = deckId ? getCards(deckId) : []
+  const allCards = useMemo(() => deckId ? getCards(deckId) : [], [deckId, getCards])
 
   useEffect(() => {
     if (allCards.length > 0 && deckId && !sessionInitialized) {
@@ -82,7 +82,7 @@ const StudyPage = () => {
       // Mark session as initialized to prevent re-running
       setSessionInitialized(true)
     }
-  }, [allCards, deckId, startStudySession, sessionInitialized])
+  }, [deckId, startStudySession, sessionInitialized, getStudySession, allCards])
 
   const currentCard = studyCards[currentCardIndex]
 
@@ -171,7 +171,7 @@ const StudyPage = () => {
       const now = new Date()
       let newInterval = currentCard.intervalDays
       let newEaseFactor = currentCard.easeFactor
-      let newReviewCount = currentCard.reviewCount + 1
+      const newReviewCount = currentCard.reviewCount + 1
 
       // Simple SM-2 algorithm implementation
       switch (difficulty) {
