@@ -61,6 +61,7 @@ export interface Database {
           description: string
           card_count: number
           is_public: boolean
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           settings: any
           created_at: string
           updated_at: string
@@ -74,6 +75,7 @@ export interface Database {
           description: string
           card_count?: number
           is_public?: boolean
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           settings?: any
           created_at?: string
           updated_at?: string
@@ -87,6 +89,7 @@ export interface Database {
           description?: string
           card_count?: number
           is_public?: boolean
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           settings?: any
           created_at?: string
           updated_at?: string
@@ -100,6 +103,7 @@ export interface Database {
           deck_id: string
           front_content: string
           back_content: string
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           card_type: any
           state: string
           due: number
@@ -115,6 +119,7 @@ export interface Database {
           deck_id: string
           front_content: string
           back_content: string
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           card_type?: any
           state?: string
           due?: number
@@ -130,6 +135,7 @@ export interface Database {
           deck_id?: string
           front_content?: string
           back_content?: string
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           card_type?: any
           state?: string
           due?: number

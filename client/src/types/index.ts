@@ -154,6 +154,7 @@ export interface AdvancedDeckSettings {
 export interface CardType {
   type: 'basic' | 'cloze' | 'multiple_choice' | 'image_occlusion' | 'audio' | 'svg_map'
   template?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options?: any
 }
 
@@ -351,6 +352,7 @@ export interface UserAchievement {
   userId: string
   achievementId: string
   earnedAt: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   progressData?: any
 }
 
@@ -588,6 +590,7 @@ export interface Notification {
   type: NotificationType
   title: string
   message: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any
   read: boolean
   createdAt: string
@@ -627,9 +630,10 @@ export const CardStateUtils = {
         return 'New - Never studied before'
       case 'learning':
         return 'Learning - Recently seen, still being learned'
-      case 'review':
+      case 'review': {
         const maturity = card.ivl < 21 ? 'Young' : 'Mature'
         return `Review (${maturity}) - Finished learning, scheduled for review`
+      }
       case 'relearning':
         return 'Relearning - Failed in review, being relearned'
       case 'suspended':
@@ -673,10 +677,11 @@ export const CardStateUtils = {
       case 'new':
         return true // New cards are always available (subject to daily limits)
       case 'learning':
-      case 'relearning':
+      case 'relearning': {
         // Learning cards use minutes, check if due time has passed
         const dueTime = currentDate.getTime() + (card.left * 60 * 1000)
         return dueTime <= currentDate.getTime()
+      }
       case 'review':
         return card.due <= currentDay
       case 'suspended':

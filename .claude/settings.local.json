@@ -18,7 +18,14 @@
       "Bash(git commit:*)",
       "Bash(git config:*)",
       "Bash(git push:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npx vercel:*)",
+      "Bash(npm run dev:*)",
+      "Bash(pkill:*)",
+      "Bash(ss:*)",
+      "Bash(find:*)",
+      "Bash(sed:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }
