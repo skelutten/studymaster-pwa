@@ -64,64 +64,34 @@ export const useAuthStore = create<AuthState>()(
             return
           }
 
-          // Try to make API call, but fallback to mock authentication if server is not available
-          try {
-            const response = await fetch('/api/auth/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, password })
-            })
-            
-            if (!response.ok) {
-              throw new Error('Login failed')
-            }
-            
-            const { user, token } = await response.json()
-            
-            // Store token in localStorage
-            localStorage.setItem('authToken', token)
-            
-            set({
-              user,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null
-            })
-          } catch (apiError) {
-            // If API call fails (server not available), use mock authentication
-            console.warn('API not available, using mock authentication')
-            
-            // Create a mock user based on the provided credentials
-            const mockUser = {
-              id: Math.random().toString(36).substr(2, 9),
-              email: email,
-              username: email.split('@')[0], // Use email prefix as username
-              level: 1,
-              totalXp: 0,
-              coins: 100,
-              gems: 10,
-              createdAt: new Date().toISOString(),
-              lastActive: new Date().toISOString(),
-              preferences: {
-                theme: 'system' as const,
-                language: 'en',
-                notifications: true,
-                soundEffects: true,
-                dailyGoal: 50,
-                timezone: 'UTC'
-              }
-            }
-            
-            // Store mock token in localStorage
-            localStorage.setItem('authToken', `mock-token-${mockUser.id}`)
-            
-            set({
-              user: mockUser,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null
-            })
+          // Make API call to authenticate
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          })
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => null)
+            const errorMessage = errorData?.message || 'Login failed'
+            throw new Error(errorMessage)
           }
+          
+          const data = await response.json()
+          
+          if (!data.success || !data.user || !data.token) {
+            throw new Error('Invalid login response')
+          }
+          
+          // Store token in localStorage
+          localStorage.setItem('authToken', data.token)
+          
+          set({
+            user: data.user,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null
+          })
         } catch (error) {
           set({
             error: error instanceof Error ? error.message : 'Login failed',
@@ -134,64 +104,34 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null })
         
         try {
-          // Try to make API call, but fallback to mock authentication if server is not available
-          try {
-            const response = await fetch('/api/auth/register', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, username, password })
-            })
-            
-            if (!response.ok) {
-              throw new Error('Registration failed')
-            }
-            
-            const { user, token } = await response.json()
-            
-            // Store token in localStorage
-            localStorage.setItem('authToken', token)
-            
-            set({
-              user,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null
-            })
-          } catch (apiError) {
-            // If API call fails (server not available), use mock authentication
-            console.warn('API not available, using mock authentication for registration')
-            
-            // Create a mock user based on the provided credentials
-            const mockUser = {
-              id: Math.random().toString(36).substr(2, 9),
-              email: email,
-              username: username,
-              level: 1,
-              totalXp: 0,
-              coins: 100,
-              gems: 10,
-              createdAt: new Date().toISOString(),
-              lastActive: new Date().toISOString(),
-              preferences: {
-                theme: 'system' as const,
-                language: 'en',
-                notifications: true,
-                soundEffects: true,
-                dailyGoal: 50,
-                timezone: 'UTC'
-              }
-            }
-            
-            // Store mock token in localStorage
-            localStorage.setItem('authToken', `mock-token-${mockUser.id}`)
-            
-            set({
-              user: mockUser,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null
-            })
+          // Make API call to register
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, username, password })
+          })
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => null)
+            const errorMessage = errorData?.message || 'Registration failed'
+            throw new Error(errorMessage)
           }
+          
+          const data = await response.json()
+          
+          if (!data.success || !data.user || !data.token) {
+            throw new Error('Invalid registration response')
+          }
+          
+          // Store token in localStorage
+          localStorage.setItem('authToken', data.token)
+          
+          set({
+            user: data.user,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null
+          })
         } catch (error) {
           set({
             error: error instanceof Error ? error.message : 'Registration failed',
