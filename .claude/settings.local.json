@@ -29,7 +29,8 @@
       "Bash(supabase status:*)",
       "Bash(curl:*)",
       "Bash(npm start)",
-      "Bash(vercel:*)"
+      "Bash(vercel:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }
