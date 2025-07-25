@@ -30,7 +30,8 @@
       "Bash(curl:*)",
       "Bash(npm start)",
       "Bash(vercel:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch client/.env.local || true' --prune-empty --tag-name-filter cat -- --all)"
     ],
     "deny": []
   }
