@@ -4,6 +4,9 @@ node_modules
 *.log
 *.lock
 *.env
+*.env.local
+*.env.production
+*.env.development
 *.DS_Store
 *.swp
 *.swo
@@ -15,3 +18,8 @@ node_modules
 *.rej
 *.coverage
 .vercel
+
+# API keys and sensitive data
+vercel.json.production
+*.key
+*.pem
