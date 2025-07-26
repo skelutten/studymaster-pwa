@@ -54,11 +54,6 @@
 - ✅ **Documentation**: Security procedures documented
 - ✅ **Memory Storage**: Security rules stored in Claude memory
 
-### Security Rules
-1. **NEVER** commit API keys to Git
-2. **ALWAYS** use deployment platform environment variables
-3. **KEEP** production credentials in excluded files
-4. **REVIEW** all commits for sensitive data before pushing
 
 ## Next Steps & Priorities
 

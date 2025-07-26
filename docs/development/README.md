@@ -1,6 +1,8 @@
-# StudyMaster Development Guide
+# Development Guide
 
-## 🚀 Quick Start
+Complete guide for developing StudyMaster PWA.
+
+## Quick Start
 
 ### Prerequisites
 - Node.js >= 18.0.0
@@ -18,14 +20,14 @@ npm install
 npm run dev
 ```
 
-## 📱 Development URLs
+## Development URLs
 
 - **Client (React/Vite)**: http://localhost:3000
 - **Server (Express API)**: http://localhost:3001
 - **API Documentation**: http://localhost:3001/api/docs
 - **Health Check**: http://localhost:3001/health
 
-## 🛠️ Available Scripts
+## Available Scripts
 
 ### Main Development Commands
 - `npm run dev` - Start both client and server with enhanced logging
@@ -54,7 +56,7 @@ npm run dev
 - `npm run lint` - Run linting for all packages
 - `npm run clean` - Clean all node_modules and dist folders
 
-## 🔧 Configuration
+## Configuration
 
 ### Port Configuration
 - **Client**: Port 3000 (configurable in `client/vite.config.ts`)
@@ -74,7 +76,7 @@ JWT_SECRET=dev-jwt-secret-key-change-in-production
 JWT_EXPIRES_IN=7d
 ```
 
-## 🔥 Hot Reload Features
+## Hot Reload Features
 
 ### Client Hot Reload
 - **Vite HMR**: Instant updates for React components, CSS, and assets
@@ -86,7 +88,7 @@ JWT_EXPIRES_IN=7d
 - **TypeScript Compilation**: Automatic recompilation on save
 - **Environment Variable Reload**: Automatic restart on `.env` changes
 
-## 🖥️ Cross-Platform Compatibility
+## Cross-Platform Compatibility
 
 ### Windows
 - Uses `npm.cmd` for script execution
@@ -107,7 +109,7 @@ The custom `start-dev.js` script provides:
 - ✅ Graceful shutdown handling (Ctrl+C)
 - ✅ Error handling and recovery
 
-## 📊 Development Monitoring
+## Development Monitoring
 
 ### Startup Logs
 ```
@@ -129,7 +131,7 @@ The custom `start-dev.js` script provides:
 - 🟦 **Cyan**: Client messages
 - 🟪 **Magenta**: Server messages
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 studymaster-pwa/
@@ -138,47 +140,22 @@ studymaster-pwa/
 ├── shared/          # Shared TypeScript types
 ├── start-dev.js     # Enhanced development launcher
 ├── package.json     # Root workspace configuration
-└── DEVELOPMENT.md   # This file
+└── docs/            # Documentation
 ```
 
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Port Already in Use**
-```bash
-# Check what's using the ports
-netstat -ano | findstr :3000
-netstat -ano | findstr :3001
-
-# Kill processes if needed (Windows)
-taskkill /PID <process_id> /F
-```
-
-**Dependencies Issues**
-```bash
-# Clean install all dependencies
-npm run clean
-npm run install:all
-```
-
-**Hot Reload Not Working**
-- Ensure you're editing files within the `src/` directories
-- Check that the file extensions are supported (.tsx, .ts, .css)
-- Verify the development servers are running without errors
-
-### Getting Help
-- Check the terminal output for detailed error messages
-- Verify all prerequisites are installed
-- Ensure ports 3000 and 3001 are available
-- Review the server logs for API-related issues
-
-## 🎯 Next Steps
+## Next Steps
 
 1. **Demo Login**: Use the "Demo Login" button to quickly access the application
 2. **API Testing**: Visit http://localhost:3001/api/docs for API documentation
 3. **Hot Reload Testing**: Make changes to any React component and see instant updates
 4. **Development**: Start building features with full hot reload support!
+
+## Related Guides
+
+- [Troubleshooting](troubleshooting.md) - Common issues and solutions
+- [Architecture](architecture.md) - System architecture overview
+- [Testing](testing.md) - Testing guidelines and setup
+- [Code Style](code-style.md) - Coding standards and conventions
 
 ---
 

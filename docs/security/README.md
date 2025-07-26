@@ -7,9 +7,9 @@ All API keys and sensitive credentials have been removed from the Git repository
 ## 📁 Environment Files Structure
 
 ### Template Files (Tracked by Git)
-- `SUPABASE_SETUP.md` - Contains placeholder values for Supabase setup
+- `docs/security/supabase-setup.md` - Contains placeholder values for Supabase setup
 - `client/vercel.json` - Contains placeholder environment variables  
-- `client/.env.local` - Template with placeholder values (ignored by git)
+- `client/.env.example` - Template with placeholder values
 
 ### Production Files (NOT tracked by Git)
 - `.env.production` - Contains actual production API keys and credentials
@@ -61,3 +61,22 @@ The repository history has been cleaned using `git filter-branch` to remove:
 - Complete credentials from `client/.env.local`
 
 All sensitive data has been completely purged from Git history.
+
+## 🔒 Security Features
+
+- JWT authentication with refresh tokens
+- Rate limiting on API endpoints
+- CORS protection
+- Helmet.js security headers
+- Input validation and sanitization
+- SQL injection prevention
+
+## Related Guides
+
+- [Supabase Setup](supabase-setup.md) - Database and authentication setup
+- [Environment Variables](../deployment/environment-variables.md) - Complete variable reference
+- [Deployment Security](../deployment/README.md) - Secure deployment practices
+
+---
+
+**Stay Secure! 🛡️**
