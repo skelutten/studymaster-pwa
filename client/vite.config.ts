@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import { Plugin } from 'vite'
+
+// Note: Using Vite's built-in SPA fallback instead of custom plugin
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -64,6 +67,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallback: '/index.html',
+        navigateFallbackAllowlist: [/^(?!\/__).*/],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'document',
@@ -135,17 +140,31 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    host: true,
+    host: '0.0.0.0',
     strictPort: false,
+    hmr: {
+      port: 3000
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true
       }
+    },
+    // Enable SPA routing - serve index.html for all non-API routes
+    middlewareMode: false,
+    fs: {
+      strict: false
     }
   },
+  // Enable history API fallback for SPA routing
   build: {
     target: 'esnext',
     sourcemap: true
-  }
+  },
+  // Add preview configuration for SPA fallback
+  preview: {
+    port: 3000,
+    host: '0.0.0.0'
+  },
 })

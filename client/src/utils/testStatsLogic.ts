@@ -22,9 +22,9 @@ export const testStatsLogic = () => {
     testStats = newStats
     console.log(`Stats after:`, testStats)
     
-    // Verify expected values
-    const expectedCorrect = Math.floor((cardNum + 1) / 2)
-    const expectedIncorrect = Math.floor(cardNum / 2)
+    // Verify expected values - 'again' = incorrect, 'hard' = correct
+    const expectedIncorrect = Math.floor((cardNum + 1) / 2)
+    const expectedCorrect = Math.floor(cardNum / 2)
     
     const correctMatch = testStats.correct === expectedCorrect
     const incorrectMatch = testStats.incorrect === expectedIncorrect

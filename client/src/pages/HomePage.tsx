@@ -93,7 +93,7 @@ const HomePage = () => {
                   <h3 className="font-semibold">{deck.title}</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">{deck.dueCount} cards due</p>
                 </div>
-                <button 
+                <button
                   onClick={() => navigate(`/study/${deck.id}`)}
                   className="btn btn-primary btn-sm"
                 >
@@ -103,7 +103,7 @@ const HomePage = () => {
             ))}
             {dueDecks.length > 3 && (
               <div className="text-center">
-                <button 
+                <button
                   onClick={() => navigate('/decks')}
                   className="btn btn-secondary btn-sm"
                 >
@@ -119,7 +119,7 @@ const HomePage = () => {
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               No cards are due for review right now. Great job!
             </p>
-            <button 
+            <button
               onClick={() => navigate('/decks')}
               className="btn btn-primary"
             >

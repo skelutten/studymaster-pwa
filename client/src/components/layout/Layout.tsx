@@ -2,14 +2,23 @@ import { Outlet } from 'react-router-dom'
 import { useState } from 'react'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
-import { useAuthStore } from '../../stores/authStore'
+import { useSupabaseAuthStore } from '../../stores/supabaseAuthStore'
 import AuthModal from './AuthModal'
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authModalOpen, setAuthModalOpen] = useState(false)
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
-  const { isAuthenticated } = useAuthStore()
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot-password'>('login')
+  const { isAuthenticated, user, session } = useSupabaseAuthStore()
+  
+  // Debug authentication state
+  console.log('[LAYOUT]', 'Layout render - Auth state:', {
+    isAuthenticated,
+    hasUser: !!user,
+    hasSession: !!session,
+    userId: user?.id,
+    timestamp: new Date().toISOString()
+  })
 
   const handleSignIn = () => {
     setAuthMode('login')

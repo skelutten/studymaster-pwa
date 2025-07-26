@@ -194,7 +194,7 @@ app.use('*', (req, res) => {
 
 const PORT = process.env.PORT || 3001
 
-server.listen(PORT, () => {
+server.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`)
   console.log(`📱 Client URL: ${process.env.CLIENT_URL || "http://localhost:3000"}`)
   console.log(`🔗 API URL: http://localhost:${PORT}`)

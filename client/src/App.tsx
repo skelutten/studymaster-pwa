@@ -10,6 +10,9 @@ import LeaderboardPage from './pages/LeaderboardPage'
 import ChallengesPage from './pages/ChallengesPage'
 import GlobalStatsPage from './pages/GlobalStatsPage'
 import MapTestPage from './pages/MapTestPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import TestResetPage from './pages/TestResetPage'
+import DebugLogTestPage from './pages/DebugLogTestPage'
 import { useThemeStore } from './stores/themeStore'
 import { useSupabaseAuthStore } from './stores/supabaseAuthStore'
 
@@ -98,7 +101,12 @@ function App() {
       )}
       
       <Routes>
-        <Route path="/" element={<Layout />}>
+        {/* Standalone routes - outside of Layout and authentication checks */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/debug-log-test" element={<DebugLogTestPage />} />
+        
+        {/* Main app routes - wrapped in Layout */}
+        <Route path="*" element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="study" element={<StudyPage />} />
           <Route path="study/:deckId" element={<StudyPage />} />

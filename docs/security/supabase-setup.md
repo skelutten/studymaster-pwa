@@ -45,7 +45,7 @@ The app uses Supabase Auth with:
 - Public decks are visible to all users
 - Proper security for all operations
 
-### 4. Environment Variables for Deployment
+### Environment Variables for Deployment
 For Vercel deployment, add these environment variables:
 ```
 VITE_SUPABASE_URL=your-supabase-url-here
@@ -89,3 +89,9 @@ Note: The actual production keys are stored in `.env.production` (not tracked by
 - Secure API endpoints
 - JWT token validation
 - CORS configuration
+
+## Related Guides
+
+- [Security Overview](README.md) - Complete security documentation
+- [Environment Variables](../deployment/environment-variables.md) - Variable configuration
+- [Database Schema](../development/database.md) - Database structure details
