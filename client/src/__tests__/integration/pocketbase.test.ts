@@ -40,6 +40,9 @@ describe('PocketBase Integration', () => {
 
     const store = usePocketbaseAuthStore.getState()
     
+    // Clear any existing auth state first
+    store.signOut()
+    
     try {
       await store.signIn('test@example.com', 'password')
       
