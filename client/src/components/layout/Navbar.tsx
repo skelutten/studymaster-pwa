@@ -1,5 +1,5 @@
 import { useThemeStore } from '../../stores/themeStore'
-import { useSupabaseAuthStore } from '../../stores/supabaseAuthStore'
+import { useAuthStore } from '../../stores/authStore'
 
 interface NavbarProps {
   onMenuClick: () => void
@@ -7,7 +7,7 @@ interface NavbarProps {
 
 const Navbar = ({ onMenuClick }: NavbarProps) => {
   const { theme, toggleTheme } = useThemeStore()
-  const { user, signOut } = useSupabaseAuthStore()
+  const { user, logout } = useAuthStore()
 
   return (
     <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
@@ -59,7 +59,7 @@ const Navbar = ({ onMenuClick }: NavbarProps) => {
                   </div>
                 </div>
                 <button
-                  onClick={signOut}
+                  onClick={logout}
                   className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
                   title="Logout"
                 >

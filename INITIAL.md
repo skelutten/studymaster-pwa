@@ -1,15 +1,24 @@
 ## FEATURE:
 
-[Insert your feature here]
+Switch from Supabase for DB and Auth to Pocketbase.
+Install Pocketbase locally and make sure it can be run.
+Migrate DB Schemas to Pocketbase
+Setup environment variables
+Replace Supabase Auth store with a Pocketbase variant.
+Create a test user called gurka with password gurka123 that will be used for testing.
+Replace DB client with Pocket base variant.
+Update all usage of Supabase to the new variant.
+Make sure to add unit test and feature test. Also update existing tests if needed.
 
 ## EXAMPLES:
 
-[Provide and explain examples that you have in the `examples/` folder]
 
 ## DOCUMENTATION:
 
-[List out any documentation (web pages, sources for an MCP server like Crawl4AI RAG, etc.) that will need to be referenced during development]
+https://pocketbase.io/docs/
+https://pocketbase.io/docs/api-files/
+
 
 ## OTHER CONSIDERATIONS:
 
-[Any other considerations or specific requirements - great place to include gotchas that you see AI coding assistants miss with your projects a lot]
+Install and use MCP servers for access to APIs. Like context7

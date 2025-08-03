@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { debugLogger } from '../utils/debugLogger';
-import { useSupabaseAuthStore } from '../stores/supabaseAuthStore';
+import { useAuthStore } from '../stores/authStore';
 
 function DebugLogTestPage() {
   const navigate = useNavigate();
-  const { session, isAuthenticated } = useSupabaseAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     debugLogger.log('[RESET_PASSWORD]', 'Debug Log Test Page mounted');
@@ -27,8 +27,8 @@ function DebugLogTestPage() {
         tokens: mockTokens
       });
       
-      // Log current session state
-      debugLogger.logSession('[RESET_PASSWORD]', 'Current session state', session);
+      // Log current auth state
+      debugLogger.log('[RESET_PASSWORD]', 'Current auth state', { isAuthenticated });
       
       // Test all logging methods
       debugLogger.info('[RESET_PASSWORD]', 'Testing info log level');
@@ -53,7 +53,7 @@ function DebugLogTestPage() {
     };
     
     testPasswordResetUrl();
-  }, [session]);
+  }, [isAuthenticated]);
 
   return (
     <div style={{ padding: '2rem' }}>

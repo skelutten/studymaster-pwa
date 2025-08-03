@@ -11,14 +11,13 @@ import ChallengesPage from './pages/ChallengesPage'
 import GlobalStatsPage from './pages/GlobalStatsPage'
 import MapTestPage from './pages/MapTestPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
-import TestResetPage from './pages/TestResetPage'
 import DebugLogTestPage from './pages/DebugLogTestPage'
 import { useThemeStore } from './stores/themeStore'
-import { useSupabaseAuthStore } from './stores/supabaseAuthStore'
+import { useAuthStore } from './stores/authStore'
 
 function App() {
   const { theme, initializeTheme } = useThemeStore()
-  const { initializeAuth } = useSupabaseAuthStore()
+  const { initializeAuth } = useAuthStore()
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [showUpdatePrompt, setShowUpdatePrompt] = useState(false)
 

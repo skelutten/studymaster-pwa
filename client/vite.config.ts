@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
-import { Plugin } from 'vite'
 
 // Note: Using Vite's built-in SPA fallback instead of custom plugin
 
