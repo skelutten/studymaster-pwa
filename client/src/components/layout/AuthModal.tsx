@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSupabaseAuthStore } from '../../stores/supabaseAuthStore'
+import { useAuthStore } from '../../stores/authStore'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -12,7 +12,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const { signIn, signUp, resetPassword, isLoading, error, clearError, isAuthenticated } = useSupabaseAuthStore()
+  const { login, register, isLoading, error, clearError, isAuthenticated } = useAuthStore()
   const [resetEmailSent, setResetEmailSent] = useState(false)
 
   // Clear errors when modal opens or mode changes
@@ -36,11 +36,12 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
     e.preventDefault()
     
     if (mode === 'login') {
-      await signIn(email, password)
+      await login(email, password)
     } else if (mode === 'register') {
-      await signUp(email, password, username)
+      await register(email, username, password)
     } else if (mode === 'forgot-password') {
-      await resetPassword(email)
+      // For now, show a message that password reset is not implemented
+      alert('Password reset functionality will be implemented soon. Please use demo login or register a new account.')
       setResetEmailSent(true)
     }
   }

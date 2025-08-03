@@ -2,6 +2,7 @@
  * Debug Logger Utility
  * Provides consistent logging format for debugging authentication issues
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 type LogLevel = 'log' | 'warn' | 'error' | 'info';
 type LogPrefix = '[RESET_PASSWORD]' | '[AUTH_STORE]' | '[SUPABASE]' | '[AUTH_MODAL]' | '[SESSION]';

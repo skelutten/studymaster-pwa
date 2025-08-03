@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+import { spawn } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import net from 'net';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // ANSI color codes for better logging
 const colors = {
@@ -67,7 +74,6 @@ function checkPrerequisites() {
 function checkPorts() {
   logInfo('Checking port availability...');
   
-  const net = require('net');
   const ports = [3000, 3001];
   
   return Promise.all(ports.map(port => {

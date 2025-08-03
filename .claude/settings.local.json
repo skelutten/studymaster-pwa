@@ -50,7 +50,15 @@
       "Bash(npm run install:all:*)",
       "Bash(npx ts-node:*)",
       "Bash(npm run:*)",
-      "WebFetch(domain:supabase.com)"
+      "WebFetch(domain:supabase.com)",
+      "Bash(powershell:*)",
+      "Bash(.pocketbase.exe serve:*)",
+      "Bash(./pocketbase.exe serve:*)",
+      "Bash(timeout:*)",
+      "WebFetch(domain:pocketbase.io)",
+      "WebFetch(domain:pocketbase.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(/c/Program Files/nodejs/npm.cmd install pocketbase --save)"
     ],
     "deny": []
   }
