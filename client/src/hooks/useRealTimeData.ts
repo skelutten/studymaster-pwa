@@ -113,6 +113,7 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}) => {
 
     let refreshTimer: NodeJS.Timeout | null = null
     const unsubscribeFunctions: (() => void)[] = []
+    let stopRealTimeUpdates: (() => void) | null = null
 
     if (enableSubscriptions) {
       // Set up real-time subscriptions
@@ -134,8 +135,8 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}) => {
 
       unsubscribeFunctions.push(unsubscribeGlobal, unsubscribeTrends, unsubscribeLive, unsubscribeMarket)
 
-      // Start real-time updates service
-      realTimeDataService.startRealTimeUpdates()
+      // Start real-time updates service with reference counting
+      stopRealTimeUpdates = realTimeDataService.startRealTimeUpdates()
     }
 
     if (autoRefresh) {
@@ -148,6 +149,11 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}) => {
     return () => {
       // Cleanup subscriptions
       unsubscribeFunctions.forEach(unsubscribe => unsubscribe())
+      
+      // Stop real-time updates (reference counting will handle when to actually stop)
+      if (stopRealTimeUpdates) {
+        stopRealTimeUpdates()
+      }
       
       // Clear refresh timer
       if (refreshTimer) {

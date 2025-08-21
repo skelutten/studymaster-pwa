@@ -4,12 +4,27 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
+// Security headers plugin for production
+const securityHeadersPlugin = () => ({
+  name: 'security-headers',
+  configureServer(server: any) {
+    server.middlewares.use((_req: any, res: any, next: any) => {
+      res.setHeader('X-Frame-Options', 'DENY')
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+      res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+      next()
+    })
+  }
+})
+
 // Note: Using Vite's built-in SPA fallback instead of custom plugin
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    securityHeadersPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
@@ -163,37 +178,43 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // Manual chunk splitting for better caching and smaller initial bundles
-        manualChunks: {
-          // Vendor libraries
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['lucide-react', 'framer-motion', 'clsx', 'tailwind-merge'],
-          'data-vendor': ['zustand', '@tanstack/react-query', 'pocketbase'],
-          'chart-vendor': ['chart.js', 'react-chartjs-2'],
+        // Optimized chunk splitting for smaller initial bundle
+        manualChunks: (id) => {
+          // Heavy dependencies that should be separate chunks
+          if (id.includes('sql.js')) return 'sql-vendor'
+          if (id.includes('jszip')) return 'zip-vendor'
+          if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'chart-vendor'
+          if (id.includes('framer-motion')) return 'animation-vendor'
           
-          // Heavy dependencies
-          'sql-vendor': ['sql.js'],
-          'zip-vendor': ['jszip'],
+          // Core React dependencies
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+            return 'react-vendor'
+          }
           
-          // App chunks
-          'services': [
-            'src/services/ankiScheduler',
-            'src/services/cardStateManager',
-            'src/services/learningStepsManager',
-            'src/services/studyQueueManager',
-            'src/services/realTimeDataService'
-          ],
-          'stores': [
-            'src/stores/deckStore',
-            'src/stores/pocketbaseAuthStore',
-            'src/stores/gamificationStore',
-            'src/stores/themeStore'
-          ],
-          'components': [
-            'src/components/dashboard',
-            'src/components/deck',
-            'src/components/gamification'
-          ]
+          // Essential UI libraries (keep smaller)
+          if (id.includes('lucide-react') || id.includes('clsx') || id.includes('tailwind-merge')) {
+            return 'ui-vendor'
+          }
+          
+          // Data management
+          if (id.includes('zustand') || id.includes('@tanstack/react-query') || id.includes('pocketbase')) {
+            return 'data-vendor'
+          }
+          
+          // Node modules (everything else external)
+          if (id.includes('node_modules')) {
+            return 'vendor'
+          }
+          
+          // App-specific chunks - only include if part of large components
+          if (id.includes('src/services/')) return 'services'
+          if (id.includes('src/stores/')) return 'stores'
+          
+          // Keep components in main bundle unless they're heavy
+          if (id.includes('src/components/dashboard/') || 
+              id.includes('src/components/gamification/')) {
+            return 'components'
+          }
         },
         // Use content-based hashing for better caching
         chunkFileNames: 'assets/[name]-[hash].js',
@@ -201,14 +222,21 @@ export default defineConfig({
         assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     },
-    // Increase chunk size warning limit for large chunks
-    chunkSizeWarningLimit: 1000,
-    // Enable tree shaking
+    // Reduce chunk size warning limit to catch large bundles  
+    chunkSizeWarningLimit: 400,
+    // Enable aggressive tree shaking and minification
     minify: 'terser',
     terserOptions: {
       compress: {
         drop_console: true,
-        drop_debugger: true
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.warn', 'console.info'],
+        dead_code: true,
+        reduce_vars: true,
+        toplevel: true
+      },
+      mangle: {
+        toplevel: true
       }
     }
   },
