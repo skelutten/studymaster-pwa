@@ -30,8 +30,6 @@
     "zustand": "^4.4.1"
   },
   "devDependencies": {
-    "@esbuild/win32-x64": "^0.25.8",
-    "@rollup/rollup-win32-x64-msvc": "^4.45.1",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",
     "@types/react": "^18.2.15",

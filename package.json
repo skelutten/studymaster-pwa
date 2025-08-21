@@ -49,8 +49,5 @@
     "npm": ">=9.0.0"
   },
   "author": "StudyMaster Team",
-  "license": "MIT",
-  "dependencies": {
-    "node": "^20.19.4"
-  }
+  "license": "MIT"
 }
