@@ -11,7 +11,6 @@
     "test": "vitest"
   },
   "dependencies": {
-    "pocketbase": "^0.21.1",
     "@tanstack/react-query": "^4.32.6",
     "chart.js": "^4.4.0",
     "clsx": "^2.0.0",
@@ -19,6 +18,7 @@
     "idb": "^7.1.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.279.0",
+    "pocketbase": "^0.21.1",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
@@ -32,6 +32,8 @@
   "devDependencies": {
     "@esbuild/win32-x64": "^0.25.8",
     "@rollup/rollup-win32-x64-msvc": "^4.45.1",
+    "@testing-library/jest-dom": "^6.6.4",
+    "@testing-library/react": "^16.3.0",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@types/sql.js": "^1.4.9",
@@ -42,6 +44,7 @@
     "eslint": "^8.45.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.3",
+    "jsdom": "^26.1.0",
     "postcss": "^8.4.29",
     "tailwindcss": "^3.3.3",
     "typescript": "^5.0.2",

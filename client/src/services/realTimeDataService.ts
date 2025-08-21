@@ -41,6 +41,7 @@ export interface MarketInsights {
 export class RealTimeDataService {
   private updateInterval: number = 30000 // 30 seconds
   private subscribers: Map<string, ((data: unknown) => void)[]> = new Map()
+  private intervalId: NodeJS.Timeout | null = null
 
   // Subscribe to real-time updates
   subscribe<T = unknown>(dataType: string, callback: (data: T) => void): () => void {
@@ -421,7 +422,12 @@ export class RealTimeDataService {
 
   // Start real-time updates
   startRealTimeUpdates(): void {
-    setInterval(async () => {
+    // Clear existing interval if any
+    if (this.intervalId) {
+      clearInterval(this.intervalId)
+    }
+
+    this.intervalId = setInterval(async () => {
       try {
         const [globalStats, trends, liveMetrics, marketInsights] = await Promise.all([
           this.getGlobalLearningStats(),
@@ -443,7 +449,13 @@ export class RealTimeDataService {
 
   // Stop real-time updates
   stopRealTimeUpdates(): void {
-    // Clear all intervals and subscriptions
+    // Clear the interval
+    if (this.intervalId) {
+      clearInterval(this.intervalId)
+      this.intervalId = null
+    }
+    
+    // Clear all subscriptions
     this.subscribers.clear()
   }
 }

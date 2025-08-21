@@ -5,13 +5,18 @@ import PocketBase from 'pocketbase'
 
 const pb = new PocketBase('http://127.0.0.1:8090')
 
-// Admin credentials
-const ADMIN_EMAIL = 'daniel6651@gmail.com'
-const ADMIN_PASSWORD = 'gulligull123'
+// Admin credentials - loaded from environment variables
+const ADMIN_EMAIL = process.env.POCKETBASE_ADMIN_EMAIL || 'admin@example.com'
+const ADMIN_PASSWORD = process.env.POCKETBASE_ADMIN_PASSWORD
 
 async function setupPocketBase() {
   try {
     console.log('🚀 Starting PocketBase setup...')
+    
+    // Check required environment variables
+    if (!ADMIN_PASSWORD) {
+      throw new Error('POCKETBASE_ADMIN_PASSWORD environment variable is required')
+    }
     
     // Authenticate as admin
     await pb.admins.authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD)
@@ -307,10 +312,10 @@ async function createTestUser() {
   
   try {
     const user = await pb.collection('users').create({
-      username: 'gurka',
-      email: 'gurka@studymaster.app',
-      password: 'gurka123',
-      passwordConfirm: 'gurka123',
+      username: 'demo_user',
+      email: 'demo@studymaster.app',
+      password: process.env.DEMO_USER_PASSWORD || 'demo123456',
+      passwordConfirm: process.env.DEMO_USER_PASSWORD || 'demo123456',
       level: 5,
       total_xp: 2500,
       coins: 150,
@@ -326,7 +331,7 @@ async function createTestUser() {
       }
     })
     
-    console.log('✅ Test user "gurka" created with ID:', user.id)
+    console.log('✅ Test user "demo_user" created with ID:', user.id)
     
     // Create a sample deck for the test user
     const deck = await pb.collection('decks').create({
@@ -380,7 +385,7 @@ async function createTestUser() {
     
   } catch (error) {
     if (error.message.includes('already exists')) {
-      console.log('ℹ️  Test user "gurka" already exists')
+      console.log('ℹ️  Test user "demo_user" already exists')
     } else {
       console.error('❌ Failed to create test user:', error.message)
     }

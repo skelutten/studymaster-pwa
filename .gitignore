@@ -23,4 +23,4 @@ node_modules
 vercel.json.production
 *.key
 *.pem
-
+*.exe

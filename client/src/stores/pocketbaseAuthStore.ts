@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { pb } from '../lib/pocketbase'
 import type { User } from '../types'
 import { debugLogger } from '../utils/debugLogger'
+import { validateForm, validationSchemas, sanitizeInput } from '../utils/validation'
 
 interface AuthState {
   user: User | null
@@ -102,24 +103,34 @@ export const usePocketbaseAuthStore = create<AuthState>()((set, get) => ({
     set({ isLoading: true, error: null })
     
     try {
-      // Validate inputs
-      if (!email || !password || !username) {
-        throw new Error('Email, username and password are required')
+      // Validate inputs using comprehensive validation
+      const validationResults = validateForm(
+        { email, password, username },
+        validationSchemas.signUp
+      )
+      
+      // Check for validation errors
+      const validationErrors = Object.entries(validationResults)
+        .filter(([_, result]) => !result.isValid)
+        .map(([field, result]) => `${field}: ${result.errors.join(', ')}`)
+      
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join('; '))
       }
       
-      if (password.length < 6) {
-        throw new Error('Password must be at least 6 characters long')
-      }
+      // Sanitize inputs
+      const sanitizedEmail = sanitizeInput(email)
+      const sanitizedUsername = sanitizeInput(username)
 
       debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Calling PocketBase create user', {
-        email,
-        username
+        email: sanitizedEmail,
+        username: sanitizedUsername
       });
 
-      // Create user in PocketBase
+      // Create user in PocketBase with sanitized data
       const userData = {
-        username,
-        email,
+        username: sanitizedUsername,
+        email: sanitizedEmail,
         password,
         passwordConfirm: password,
         level: 1,
@@ -143,8 +154,8 @@ export const usePocketbaseAuthStore = create<AuthState>()((set, get) => ({
         userId: newUser.id
       });
 
-      // Now sign in the user
-      const authData = await pb.collection('users').authWithPassword(email, password)
+      // Now sign in the user with sanitized email
+      const authData = await pb.collection('users').authWithPassword(sanitizedEmail, password)
       
       debugLogger.log('[POCKETBASE_AUTH_STORE]', 'SignUp with auth successful', {
         userId: authData.record.id,
@@ -206,7 +217,7 @@ export const usePocketbaseAuthStore = create<AuthState>()((set, get) => ({
     }, 10000) // 10 second timeout
     
     try {
-      // Check for demo login
+      // Check for demo login first (skip validation for demo)
       if (email === 'demo' || email === '') {
         debugLogger.info('[POCKETBASE_AUTH_STORE]', 'Demo login detected');
         
@@ -246,16 +257,35 @@ export const usePocketbaseAuthStore = create<AuthState>()((set, get) => ({
         return
       }
 
+      // Validate inputs for non-demo login
+      const validationResults = validateForm(
+        { email, password },
+        validationSchemas.signIn
+      )
+      
+      // Check for validation errors
+      const validationErrors = Object.entries(validationResults)
+        .filter(([_, result]) => !result.isValid)
+        .map(([field, result]) => `${field}: ${result.errors.join(', ')}`)
+      
+      if (validationErrors.length > 0) {
+        clearTimeout(timeoutId)
+        throw new Error(validationErrors.join('; '))
+      }
+      
+      // Sanitize email input
+      const sanitizedEmail = sanitizeInput(email)
+
       debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Attempting PocketBase authWithPassword');
       
       // Try email first, then username
       let authData
       try {
-        authData = await pb.collection('users').authWithPassword(email, password)
+        authData = await pb.collection('users').authWithPassword(sanitizedEmail, password)
       } catch (emailError) {
         // If email login fails, try username
         debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Email login failed, trying username');
-        authData = await pb.collection('users').authWithPassword(email, password)
+        authData = await pb.collection('users').authWithPassword(sanitizedEmail, password)
       }
 
       debugLogger.log('[POCKETBASE_AUTH_STORE]', 'SignIn response', {

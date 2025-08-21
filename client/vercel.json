@@ -1,6 +1,6 @@
 {
   "env": {
-    "VITE_SUPABASE_URL": "your-supabase-url-here",
-    "VITE_SUPABASE_ANON_KEY": "your-supabase-anon-key-here"
+    "VITE_POCKETBASE_URL": "https://your-pocketbase-url.com",
+    "NODE_ENV": "production"
   }
 }

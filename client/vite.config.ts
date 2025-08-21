@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -156,10 +157,60 @@ export default defineConfig({
       strict: false
     }
   },
-  // Enable history API fallback for SPA routing
+  // Enable history API fallback for SPA routing and implement code splitting
   build: {
     target: 'esnext',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Manual chunk splitting for better caching and smaller initial bundles
+        manualChunks: {
+          // Vendor libraries
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['lucide-react', 'framer-motion', 'clsx', 'tailwind-merge'],
+          'data-vendor': ['zustand', '@tanstack/react-query', 'pocketbase'],
+          'chart-vendor': ['chart.js', 'react-chartjs-2'],
+          
+          // Heavy dependencies
+          'sql-vendor': ['sql.js'],
+          'zip-vendor': ['jszip'],
+          
+          // App chunks
+          'services': [
+            'src/services/ankiScheduler',
+            'src/services/cardStateManager',
+            'src/services/learningStepsManager',
+            'src/services/studyQueueManager',
+            'src/services/realTimeDataService'
+          ],
+          'stores': [
+            'src/stores/deckStore',
+            'src/stores/pocketbaseAuthStore',
+            'src/stores/gamificationStore',
+            'src/stores/themeStore'
+          ],
+          'components': [
+            'src/components/dashboard',
+            'src/components/deck',
+            'src/components/gamification'
+          ]
+        },
+        // Use content-based hashing for better caching
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      }
+    },
+    // Increase chunk size warning limit for large chunks
+    chunkSizeWarningLimit: 1000,
+    // Enable tree shaking
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    }
   },
   // Add preview configuration for SPA fallback
   preview: {
@@ -169,7 +220,7 @@ export default defineConfig({
   // Vitest configuration
   test: {
     globals: true,
-    environment: 'node',
+    environment: 'jsdom',
     setupFiles: []
   }
 })
