@@ -37,18 +37,74 @@ export class StudyQueueManager {
     // Get current daily limits
     const limits = this.getDailyLimits(deckId)
     
-    // Filter cards by state and due status
+    // Single-pass categorization of cards for O(n) performance
     const now = new Date()
+    const currentTime = now.getTime()
     const currentDaysSinceEpoch = this.dateToDaysSinceEpoch(now)
     
-    const newCards = this.getNewCards(allCards, settings, limits)
-    const learningCards = this.getLearningCards(allCards, now)
-    const reviewCards = this.getReviewCards(allCards, currentDaysSinceEpoch, settings, limits)
-    const relearnCards = this.getRelearnCards(allCards, now)
+    // Initialize categorized card arrays
+    const cardCategories = {
+      newCards: [] as Card[],
+      learningCards: [] as Card[],
+      reviewCards: [] as Card[],
+      youngReviewCards: [] as Card[],
+      matureReviewCards: [] as Card[],
+      relearnCards: [] as Card[]
+    }
 
-    // Categorize review cards by maturity (Anki-style)
-    const youngReviewCards = reviewCards.filter(card => card.ivl < 21)
-    const matureReviewCards = reviewCards.filter(card => card.ivl >= 21)
+    // Single pass through all cards to categorize them
+    for (const card of allCards) {
+      switch (card.state) {
+        case 'new':
+          if (cardCategories.newCards.length < (settings.newCards.newCardsPerDay - limits.newCardsStudied)) {
+            cardCategories.newCards.push(card)
+          }
+          break
+          
+        case 'learning':
+          // Check if learning card is due (uses minutes)
+          const learningDueTime = currentTime + (card.left * 60 * 1000)
+          if (learningDueTime <= currentTime) {
+            cardCategories.learningCards.push(card)
+          }
+          break
+          
+        case 'review':
+          if (card.due <= currentDaysSinceEpoch && 
+              cardCategories.reviewCards.length < (settings.reviews.maximumReviewsPerDay - limits.reviewsCompleted)) {
+            cardCategories.reviewCards.push(card)
+            
+            // Also categorize by maturity while we're at it
+            if (card.ivl < 21) {
+              cardCategories.youngReviewCards.push(card)
+            } else {
+              cardCategories.matureReviewCards.push(card)
+            }
+          }
+          break
+          
+        case 'relearning':
+          // Check if relearning card is due (uses minutes like learning cards)
+          const relearnDueTime = currentTime + (card.left * 60 * 1000)
+          if (relearnDueTime <= currentTime) {
+            cardCategories.relearnCards.push(card)
+          }
+          break
+          
+        // Skip suspended and buried cards
+        case 'suspended':
+        case 'buried':
+          break
+      }
+    }
+
+    // Apply sorting to each category
+    const newCards = this.sortNewCards(cardCategories.newCards, settings)
+    const learningCards = this.sortLearningCards(cardCategories.learningCards, currentTime)
+    const reviewCards = this.sortReviewCards(cardCategories.reviewCards)
+    const relearnCards = this.sortRelearnCards(cardCategories.relearnCards, currentTime)
+    const youngReviewCards = cardCategories.youngReviewCards
+    const matureReviewCards = cardCategories.matureReviewCards
 
     // Calculate counts
     const counts = {
@@ -353,78 +409,37 @@ export class StudyQueueManager {
 
   // Private helper methods
 
-  private getNewCards(
-    allCards: Card[],
-    settings: AdvancedDeckSettings,
-    limits: DailyStudyLimits
-  ): Card[] {
-    const availableNewCards = allCards
-      .filter(card => card.state === 'new')
-      .slice(0, settings.newCards.newCardsPerDay - limits.newCardsStudied)
-
-    // Sort by order setting
+  // Optimized sorting methods for pre-categorized cards
+  private sortNewCards(newCards: Card[], settings: AdvancedDeckSettings): Card[] {
     if (settings.newCards.orderNewCards === 'random') {
-      return this.shuffleArray([...availableNewCards])
+      return this.shuffleArray([...newCards])
     } else {
       // Sort by due date (creation order)
-      return availableNewCards.sort((a, b) => a.due - b.due)
+      return newCards.sort((a, b) => a.due - b.due)
     }
   }
 
-  private getLearningCards(allCards: Card[], now: Date): Card[] {
-    const currentTime = now.getTime()
-    
-    return allCards
-      .filter(card => {
-        if (card.state !== 'learning' && card.state !== 'relearning') {
-          return false
-        }
-        
-        // Check if card is due (learning cards use minutes)
-        const dueTime = currentTime + (card.left * 60 * 1000)
-        return dueTime <= currentTime
-      })
-      .sort((a, b) => {
-        // Sort by due time (earliest first)
-        const aDueTime = currentTime + (a.left * 60 * 1000)
-        const bDueTime = currentTime + (b.left * 60 * 1000)
-        return aDueTime - bDueTime
-      })
+  private sortLearningCards(learningCards: Card[], currentTime: number): Card[] {
+    return learningCards.sort((a, b) => {
+      // Sort by due time (earliest first)
+      const aDueTime = currentTime + (a.left * 60 * 1000)
+      const bDueTime = currentTime + (b.left * 60 * 1000)
+      return aDueTime - bDueTime
+    })
   }
 
-  private getReviewCards(
-    allCards: Card[],
-    currentDay: number,
-    settings: AdvancedDeckSettings,
-    limits: DailyStudyLimits
-  ): Card[] {
-    const availableReviewCards = allCards
-      .filter(card => card.state === 'review' && card.due <= currentDay)
-      .slice(0, settings.reviews.maximumReviewsPerDay - limits.reviewsCompleted)
-
+  private sortReviewCards(reviewCards: Card[]): Card[] {
     // Sort by due date (overdue cards first)
-    return availableReviewCards.sort((a, b) => a.due - b.due)
+    return reviewCards.sort((a, b) => a.due - b.due)
   }
 
-  private getRelearnCards(allCards: Card[], now: Date): Card[] {
-    const currentTime = now.getTime()
-    
-    return allCards
-      .filter(card => {
-        if (card.state !== 'relearning') {
-          return false
-        }
-        
-        // Check if card is due (relearning cards use minutes like learning cards)
-        const dueTime = currentTime + (card.left * 60 * 1000)
-        return dueTime <= currentTime
-      })
-      .sort((a, b) => {
-        // Sort by due time (earliest first)
-        const aDueTime = currentTime + (a.left * 60 * 1000)
-        const bDueTime = currentTime + (b.left * 60 * 1000)
-        return aDueTime - bDueTime
-      })
+  private sortRelearnCards(relearnCards: Card[], currentTime: number): Card[] {
+    return relearnCards.sort((a, b) => {
+      // Sort by due time (earliest first)
+      const aDueTime = currentTime + (a.left * 60 * 1000)
+      const bDueTime = currentTime + (b.left * 60 * 1000)
+      return aDueTime - bDueTime
+    })
   }
 
   private findNextCardDue(allCards: Card[]): Date | undefined {

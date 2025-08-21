@@ -2,8 +2,6 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Deck, Card, DeckSettings } from '../../../shared/types'
 import { createNewCard } from '../utils/cardDefaults'
-import JSZip from 'jszip'
-import initSqlJs from 'sql.js'
 
 interface StudySession {
   deckId: string
@@ -149,9 +147,15 @@ const detectBestFieldCombination = (sampleFields: string[][]): { frontIndex: num
   return { frontIndex: 0, backIndex: 1 }
 }
 
-// Helper function to parse .apkg files
+// Helper function to parse .apkg files (with dynamic imports for bundle optimization)
 const parseApkgFile = async (file: File): Promise<{ name: string; cards: Array<{ front: string; back: string }> }> => {
   try {
+    // Dynamic imports to reduce initial bundle size
+    const [{ default: JSZip }, { default: initSqlJs }] = await Promise.all([
+      import('jszip'),
+      import('sql.js')
+    ])
+
     // Initialize SQL.js
     const SQL = await initSqlJs({
       locateFile: (file) => `https://sql.js.org/dist/${file}`

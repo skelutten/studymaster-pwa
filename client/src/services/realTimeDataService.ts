@@ -42,6 +42,7 @@ export class RealTimeDataService {
   private updateInterval: number = 30000 // 30 seconds
   private subscribers: Map<string, ((data: unknown) => void)[]> = new Map()
   private intervalId: NodeJS.Timeout | null = null
+  private activeInstances: number = 0 // Reference counter for active instances
 
   // Subscribe to real-time updates
   subscribe<T = unknown>(dataType: string, callback: (data: T) => void): () => void {
@@ -420,41 +421,56 @@ export class RealTimeDataService {
     return null
   }
 
-  // Start real-time updates
-  startRealTimeUpdates(): void {
-    // Clear existing interval if any
-    if (this.intervalId) {
-      clearInterval(this.intervalId)
+  // Start real-time updates with reference counting
+  startRealTimeUpdates(): () => void {
+    this.activeInstances++
+    
+    // Only start interval if this is the first instance
+    if (this.activeInstances === 1 && !this.intervalId) {
+      this.intervalId = setInterval(async () => {
+        try {
+          const [globalStats, trends, liveMetrics, marketInsights] = await Promise.all([
+            this.getGlobalLearningStats(),
+            this.getEducationalTrends(),
+            this.getLiveUserMetrics(),
+            this.getMarketInsights()
+          ])
+
+          // Notify all subscribers with fresh data
+          this.notify('globalStats', globalStats)
+          this.notify('educationalTrends', trends)
+          this.notify('liveMetrics', liveMetrics)
+          this.notify('marketInsights', marketInsights)
+        } catch (error) {
+          console.error('Error updating real-time data:', error)
+        }
+      }, this.updateInterval)
     }
 
-    this.intervalId = setInterval(async () => {
-      try {
-        const [globalStats, trends, liveMetrics, marketInsights] = await Promise.all([
-          this.getGlobalLearningStats(),
-          this.getEducationalTrends(),
-          this.getLiveUserMetrics(),
-          this.getMarketInsights()
-        ])
-
-        // Notify all subscribers with fresh data
-        this.notify('globalStats', globalStats)
-        this.notify('educationalTrends', trends)
-        this.notify('liveMetrics', liveMetrics)
-        this.notify('marketInsights', marketInsights)
-      } catch (error) {
-        console.error('Error updating real-time data:', error)
-      }
-    }, this.updateInterval)
+    // Return cleanup function
+    return () => {
+      this.stopRealTimeUpdates()
+    }
   }
 
-  // Stop real-time updates
+  // Stop real-time updates with reference counting
   stopRealTimeUpdates(): void {
-    // Clear the interval
+    this.activeInstances = Math.max(0, this.activeInstances - 1)
+    
+    // Only stop interval when no more active instances
+    if (this.activeInstances === 0 && this.intervalId) {
+      clearInterval(this.intervalId)
+      this.intervalId = null
+    }
+  }
+
+  // Force stop all real-time updates (for cleanup)
+  forceStopRealTimeUpdates(): void {
+    this.activeInstances = 0
     if (this.intervalId) {
       clearInterval(this.intervalId)
       this.intervalId = null
     }
-    
     // Clear all subscriptions
     this.subscribers.clear()
   }

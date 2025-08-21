@@ -217,11 +217,14 @@ export const usePocketbaseAuthStore = create<AuthState>()((set, get) => ({
     }, 10000) // 10 second timeout
     
     try {
-      // Check for demo login first (skip validation for demo)
-      if (email === 'demo' || email === '') {
-        debugLogger.info('[POCKETBASE_AUTH_STORE]', 'Demo login detected');
+      // Check for demo login (only available in development)
+      const isDevelopment = import.meta.env.NODE_ENV === 'development' || import.meta.env.VITE_ENABLE_DEBUG_LOGGING === 'true'
+      const demoPassword = import.meta.env.VITE_DEMO_PASSWORD || 'demo123456'
+      
+      if (isDevelopment && email === 'demo' && password === demoPassword) {
+        debugLogger.info('[POCKETBASE_AUTH_STORE]', 'Demo login detected (development mode)');
         
-        // Demo user - create temporary session
+        // Demo user - create temporary session (development only)
         const demoUser: User = {
           id: 'demo-user',
           email: 'demo@studymaster.app',
