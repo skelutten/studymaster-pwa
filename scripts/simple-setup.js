@@ -42,8 +42,8 @@ async function testEndpoints() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: 'daniel6651@gmail.com',
-          password: 'gulligull123'
+          email: process.env.POCKETBASE_ADMIN_EMAIL || 'admin@example.com',
+          password: process.env.POCKETBASE_ADMIN_PASSWORD || 'REPLACE_WITH_ACTUAL_PASSWORD'
         })
       });
       console.log(`${endpoint}: ${response.status}`);

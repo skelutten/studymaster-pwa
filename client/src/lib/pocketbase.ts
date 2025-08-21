@@ -1,102 +1,5 @@
-// Temporary PocketBase client implementation
-// TODO: Replace with 'import PocketBase from "pocketbase"' after npm install
-/* eslint-disable @typescript-eslint/no-unused-vars */
-class SimplePocketBase {
-  baseUrl: string
-  authStore: {
-    token: string | null
-    model: Record<string, unknown> | null
-    isValid: boolean
-    onChange: (callback: (token: string | null, model: Record<string, unknown> | null) => void) => void
-    clear: () => void
-  }
-
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl
-    this.authStore = {
-      token: null,
-      model: null,
-      isValid: false,
-      onChange: (_callback: (token: string | null, model: Record<string, unknown> | null) => void) => {
-        // Simple implementation - in real PocketBase this would be more sophisticated
-      },
-      clear: () => {
-        this.authStore.token = null
-        this.authStore.model = null
-        this.authStore.isValid = false
-      }
-    }
-  }
-
-  collection(name: string) {
-    return {
-      create: async (data: Record<string, unknown>) => {
-        const response = await fetch(`${this.baseUrl}/api/collections/${name}/records`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        })
-        return response.json()
-      },
-      
-      getOne: async (id: string, _options?: Record<string, unknown>) => {
-        const response = await fetch(`${this.baseUrl}/api/collections/${name}/records/${id}`)
-        return response.json()
-      },
-      
-      getList: async (page = 1, perPage = 30, _options?: Record<string, unknown>) => {
-        const response = await fetch(`${this.baseUrl}/api/collections/${name}/records?page=${page}&perPage=${perPage}`)
-        return response.json()
-      },
-      
-      update: async (id: string, data: Record<string, unknown>) => {
-        const response = await fetch(`${this.baseUrl}/api/collections/${name}/records/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        })
-        return response.json()
-      },
-      
-      delete: async (id: string) => {
-        const response = await fetch(`${this.baseUrl}/api/collections/${name}/records/${id}`, {
-          method: 'DELETE'
-        })
-        return response.ok
-      },
-      
-      authWithPassword: async (usernameOrEmail: string, password: string) => {
-        const response = await fetch(`${this.baseUrl}/api/collections/${name}/auth-with-password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identity: usernameOrEmail,
-            password: password
-          })
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          this.authStore.token = data.token
-          this.authStore.model = data.record
-          this.authStore.isValid = true
-          return data
-        } else {
-          throw new Error('Authentication failed')
-        }
-      },
-      
-      requestPasswordReset: async (email: string) => {
-        const response = await fetch(`${this.baseUrl}/api/collections/${name}/request-password-reset`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        })
-        return response.json()
-      }
-    }
-  }
-}
+// Official PocketBase SDK Implementation
+import PocketBase from 'pocketbase'
 
 import { debugLogger } from '../utils/debugLogger'
 
@@ -108,8 +11,8 @@ debugLogger.log('[POCKETBASE]', 'Initializing PocketBase client', {
   environment: import.meta.env.MODE
 });
 
-// Create PocketBase client
-export const pb = new SimplePocketBase(pocketbaseUrl)
+// Create PocketBase client with official SDK
+export const pb = new PocketBase(pocketbaseUrl)
 
 // Log successful client creation
 debugLogger.log('[POCKETBASE]', 'PocketBase client created successfully');
@@ -205,4 +108,4 @@ export const collections = {
 }
 
 // Export PocketBase client as default
-export default SimplePocketBase
+export default pb

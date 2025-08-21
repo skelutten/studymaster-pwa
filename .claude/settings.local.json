@@ -58,7 +58,15 @@
       "WebFetch(domain:pocketbase.io)",
       "WebFetch(domain:pocketbase.io)",
       "WebFetch(domain:github.com)",
-      "Bash(/c/Program Files/nodejs/npm.cmd install pocketbase --save)"
+      "Bash(/c/Program Files/nodejs/npm.cmd install pocketbase --save)",
+      "Bash(wsl:*)",
+      "Bash(npm audit:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(npm test)",
+      "Bash(npm test:*)",
+      "Bash(rg:*)",
+      "Bash(npx vite build:*)"
     ],
     "deny": []
   }
