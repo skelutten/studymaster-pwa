@@ -1,7 +1,7 @@
 // PocketBase Integration Tests
 import { describe, it, expect, vi } from 'vitest'
 import { pb } from '../../lib/pocketbase'
-import { usePocketbaseAuthStore } from '../../stores/pocketbaseAuthStore'
+import { useAuthStore } from '../../stores/authStore'
 
 describe('PocketBase Integration', () => {
   it('should have PocketBase client configured correctly', () => {
@@ -10,7 +10,7 @@ describe('PocketBase Integration', () => {
   })
 
   it('should have PocketBase auth store configured', () => {
-    const store = usePocketbaseAuthStore.getState()
+    const store = useAuthStore.getState()
     expect(store).toBeDefined()
     expect(store.signIn).toBeDefined()
     expect(store.signUp).toBeDefined()
@@ -19,12 +19,12 @@ describe('PocketBase Integration', () => {
   })
 
   it('should handle demo user authentication', async () => {
-    const store = usePocketbaseAuthStore.getState()
+    const store = useAuthStore.getState()
     
     // Test demo login
     await store.signIn('demo', 'any-password')
     
-    const state = usePocketbaseAuthStore.getState()
+    const state = useAuthStore.getState()
     expect(state.isAuthenticated).toBe(true)
     expect(state.user).toBeDefined()
     expect(state.user?.email).toBe('demo@studymaster.app')
@@ -38,7 +38,7 @@ describe('PocketBase Integration', () => {
       authWithPassword: vi.fn().mockRejectedValue(new Error('Connection failed'))
     })) as unknown
 
-    const store = usePocketbaseAuthStore.getState()
+    const store = useAuthStore.getState()
     
     // Clear any existing auth state first
     store.signOut()
@@ -46,7 +46,7 @@ describe('PocketBase Integration', () => {
     try {
       await store.signIn('test@example.com', 'password')
       
-      const state = usePocketbaseAuthStore.getState()
+      const state = useAuthStore.getState()
       // Should handle error gracefully
       expect(state.error).toBeDefined()
       expect(state.isAuthenticated).toBe(false)
@@ -57,15 +57,15 @@ describe('PocketBase Integration', () => {
   })
 
   it('should clear auth state on sign out', async () => {
-    const store = usePocketbaseAuthStore.getState()
+    const store = useAuthStore.getState()
     
     // First sign in as demo user
     await store.signIn('demo', 'any-password')
-    expect(usePocketbaseAuthStore.getState().isAuthenticated).toBe(true)
+    expect(useAuthStore.getState().isAuthenticated).toBe(true)
     
     // Then sign out
     await store.signOut()
-    const state = usePocketbaseAuthStore.getState()
+    const state = useAuthStore.getState()
     
     expect(state.isAuthenticated).toBe(false)
     expect(state.user).toBeNull()
@@ -73,13 +73,13 @@ describe('PocketBase Integration', () => {
   })
 
   it('should initialize auth store properly', async () => {
-    const store = usePocketbaseAuthStore.getState()
+    const store = useAuthStore.getState()
     
     // Test initialization
     await store.initializeAuth()
     
     // Should not crash and should maintain proper state
-    const state = usePocketbaseAuthStore.getState()
+    const state = useAuthStore.getState()
     expect(state.isLoading).toBe(false)
   })
 })
