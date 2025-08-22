@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!-- Background -->
+  <rect width="96" height="96" rx="20" fill="#f59e0b"/>
+  
+  <!-- Trophy/Podium -->
+  <g transform="translate(48, 48)">
+    <!-- Podium base -->
+    <rect x="-15" y="5" width="30" height="12" rx="2" fill="#6b7280"/>
+    
+    <!-- Trophy cup -->
+    <ellipse cx="0" cy="-8" rx="12" ry="8" fill="#fbbf24"/>
+    <ellipse cx="0" cy="-10" rx="10" ry="6" fill="#ffffff"/>
+    
+    <!-- Trophy handles -->
+    <path d="M-12,-8 Q-18,-8 -18,-4 Q-18,0 -12,0" fill="none" stroke="#f59e0b" stroke-width="2"/>
+    <path d="M12,-8 Q18,-8 18,-4 Q18,0 12,0" fill="none" stroke="#f59e0b" stroke-width="2"/>
+    
+    <!-- Trophy stem -->
+    <rect x="-3" y="0" width="6" height="8" fill="#6b7280"/>
+    
+    <!-- Crown on top -->
+    <path d="M-8,-15 L-4,-18 L0,-15 L4,-18 L8,-15 L6,-10 L-6,-10 Z" fill="#f59e0b"/>
+    <circle cx="-4" cy="-16" r="1.5" fill="#fbbf24"/>
+    <circle cx="0" cy="-17" r="1.5" fill="#fbbf24"/>
+    <circle cx="4" cy="-16" r="1.5" fill="#fbbf24"/>
+  </g>
+</svg>

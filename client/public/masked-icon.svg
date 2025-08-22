@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Simple monochrome version for mask-icon -->
+  <rect x="140" y="180" width="232" height="152" rx="12" fill="currentColor"/>
+  <circle cx="320" cy="155" r="35" fill="currentColor"/>
+  <rect x="140" y="350" width="140" height="8" rx="4" fill="currentColor"/>
+</svg>

@@ -1,0 +1,26 @@
+/*.svg
+*.apkg
+node_modules
+*.log
+*.lock
+*.env
+*.env.local
+*.env.production
+*.env.development
+*.DS_Store
+*.swp
+*.swo
+*.bak
+*.tmp
+*.cache
+*.pid
+*.orig
+*.rej
+*.coverage
+.vercel
+
+# API keys and sensitive data
+vercel.json.production
+*.key
+*.pem
+*.exe
