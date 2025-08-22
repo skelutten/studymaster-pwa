@@ -1,0 +1,53 @@
+{
+  "name": "studymaster-pwa",
+  "version": "1.0.0",
+  "description": "A modern PWA combining the best features of Anki, AnkiDroid, and Quizlet with gamification",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "node start-dev.js",
+    "dev:concurrently": "concurrently --kill-others --prefix \"[{name}]\" --names \"CLIENT,SERVER\" --prefix-colors \"cyan,magenta\" \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "dev:verbose": "concurrently --kill-others --prefix \"[{name}]\" --names \"CLIENT,SERVER\" --prefix-colors \"cyan,magenta\" --timestamp-format \"HH:mm:ss\" \"npm run dev:client\" \"npm run dev:server\"",
+    "start": "npm run dev",
+    "install:all": "npm install && npm run install:client && npm run install:server && npm run install:shared",
+    "install:client": "cd client && npm install",
+    "install:server": "cd server && npm install",
+    "install:shared": "cd shared && npm install",
+    "build": "npm run build:shared && npm run build:client && npm run build:server",
+    "build:client": "cd client && npm run build",
+    "build:server": "cd server && npm run build",
+    "build:shared": "cd shared && npm run build",
+    "test": "npm run test:client && npm run test:server",
+    "test:client": "cd client && npm run test",
+    "test:server": "cd server && npm run test",
+    "lint": "npm run lint:client && npm run lint:server",
+    "lint:client": "cd client && npm run lint",
+    "lint:server": "cd server && npm run lint",
+    "clean": "npm run clean:client && npm run clean:server && npm run clean:shared",
+    "clean:client": "cd client && rm -rf node_modules dist",
+    "clean:server": "cd server && rm -rf node_modules dist",
+    "clean:shared": "cd shared && rm -rf node_modules dist"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "concurrently": "^8.2.2",
+    "esbuild": "0.25.8",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.3.0",
+    "typescript-eslint": "^8.38.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "author": "StudyMaster Team",
+  "license": "MIT"
+}
