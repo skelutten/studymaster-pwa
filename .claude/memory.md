@@ -36,8 +36,17 @@
 - Set environment variables through Vercel Dashboard UI
 - Never put real credentials in vercel.json files
 
+### Development Requirements
+- **ALWAYS write and run unit tests for code changes done**
+- All code modifications must include corresponding test coverage
+- Run tests before committing changes to ensure quality
+- Maintain comprehensive test suite for authentication, services, and utilities
+
 ### Current Status
 - All sensitive data removed from Git repository
 - Comprehensive documentation created in `.claude/` folder
 - Security rules permanently stored and enforced
 - Ready for secure deployment with proper environment variable setup
+- Phase 2 architectural improvements completed (auth consolidation, method refactoring, service splitting)
+- Production deployment active on Vercel
+- Development server syntax issues resolved
