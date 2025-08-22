@@ -64,7 +64,7 @@ export const validationRules = {
   noSQLInjection: (message = 'Invalid characters detected'): ValidationRule => ({
     test: (value: string) => {
       // Basic SQL injection prevention
-      const sqlInjectionRegex = /('|\\')|(;|\\;)|(--|\\/\*)|(union|select|insert|delete|update|drop|create|alter|exec|execute)\s/i
+      const sqlInjectionRegex = /('|\\')|(;|\\;)|(--|\\/\\\*)|(union|select|insert|delete|update|drop|create|alter|exec|execute)\s/i
       return !sqlInjectionRegex.test(value)
     },
     message

@@ -38,6 +38,8 @@
 
 ### Development Requirements
 - **ALWAYS write and run unit tests for code changes done**
+- **ALWAYS try to access the local deployment after doing changes and make sure it is accessible**
+- **Do smoke tests like login with test user after changes**
 - All code modifications must include corresponding test coverage
 - Run tests before committing changes to ensure quality
 - Maintain comprehensive test suite for authentication, services, and utilities
