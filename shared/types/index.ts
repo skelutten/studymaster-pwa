@@ -606,6 +606,29 @@ export type NotificationType =
   | 'community_goal_achieved'
   | 'leaderboard_position_changed'
 
+// Enhanced types from UAMS v3.0
+export * from './enhanced-types';
+
+// Update existing Card interface to extend new UnifiedCard capabilities
+export interface Card {
+  // ... existing fields ...
+  // Enhanced fields are optional for migration compatibility
+  difficulty?: number;
+  stability?: number;
+  retrievability?: number;
+  fsrsParameters?: number[];
+  performanceHistory?: any[];
+  averageResponseTime?: number;
+  cognitiveLoadIndex?: number;
+  confidenceLevel?: 'building' | 'optimal' | 'struggling';
+  conceptSimilarity?: string[];
+  lastClusterReview?: string;
+  contextualDifficulty?: Record<string, any>;
+  stabilityTrend?: 'increasing' | 'decreasing' | 'stable';
+  retrievabilityHistory?: number[];
+  optimalInterval?: number;
+}
+
 // Utility functions for Anki-style card state management
 export const CardStateUtils = {
   /**

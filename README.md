@@ -116,4 +116,43 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
+## 🛑 Terminating Running Instances
+
+If you need to terminate running instances of the StudyMaster PWA app, you can use the provided PowerShell script:
+
+```powershell
+# Navigate to the project root directory
+cd path\to\studymaster-pwa
+
+# Run the script to terminate all running instances
+.\terminate_instances.ps1
+```
+
+## 🛑 Terminating Running Instances
+
+If you need to terminate running instances of the StudyMaster PWA app, you can use the provided scripts:
+
+### For Windows (PowerShell)
+```powershell
+# Navigate to the project root directory
+cd path\to\studymaster-pwa
+
+# Run the script to terminate all running instances
+.\terminate_instances.ps1
+```
+
+### For Linux/macOS (Bash)
+```bash
+# Navigate to the project root directory
+cd /path/to/studymaster-pwa
+
+# Make the script executable (if not already)
+chmod +x terminate_instances.sh
+
+# Run the script to terminate all running instances
+./terminate_instances.sh
+```
+
+These scripts will find and terminate all running instances of the Node.js processes associated with the app.
+
 **Happy Learning! 🎓**

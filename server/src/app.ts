@@ -18,6 +18,7 @@ import cardRoutes from './routes/cards'
 import studyRoutes from './routes/study'
 import gamificationRoutes from './routes/gamification'
 import socialRoutes from './routes/social'
+import uamsRoutes from './routes/uams'
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler'
@@ -86,7 +87,8 @@ app.get('/', (req, res) => {
       cards: '/api/cards',
       study: '/api/study',
       gamification: '/api/gamification',
-      social: '/api/social'
+      social: '/api/social',
+      uams: '/api/uams'
     },
     documentation: '/api/docs'
   })
@@ -137,6 +139,13 @@ app.get('/api/docs', (req, res) => {
         'GET /api/social/friends/:userId': 'Get user friends',
         'GET /api/social/challenges/:userId': 'Get user challenges',
         'POST /api/social/share': 'Share deck or achievement'
+      },
+      uams: {
+        'POST /api/uams/start-session': 'Start UAMS learning session',
+        'POST /api/uams/submit-response': 'Submit card response with FSRS',
+        'GET /api/uams/queue/:sessionId': 'Get adaptive card queue',
+        'GET /api/uams/analytics/:userId': 'Get learning analytics',
+        'POST /api/uams/update-context': 'Update environmental context'
       }
     }
   })
@@ -150,6 +159,7 @@ app.use('/api/cards', cardRoutes)
 app.use('/api/study', studyRoutes)
 app.use('/api/gamification', gamificationRoutes)
 app.use('/api/social', socialRoutes)
+app.use('/api/uams', uamsRoutes)
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
