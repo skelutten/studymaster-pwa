@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { flushSync } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useDeckStore } from '../stores/deckStore'
+import { useDeckStore, useCurrentCard } from '../stores/deckStore'
 import { useGamificationStore } from '../stores/gamificationStore'
-import { Card } from '../../../shared/types'
+import { EnhancedCard, ResponseLog } from '../types/enhancedTypes'
+import { FSRS } from '../services/fsrsEngine'
 import CardRenderer from '../components/study/CardRenderer'
 import { useStudyKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { StudyShortcutsHelp } from '../components/study/KeyboardShortcutsHelp'
@@ -22,69 +23,61 @@ const StudyPage = () => {
     startStudySession,
     updateStudySession,
     clearStudySession,
+    currentStudySession,
     getStudySession
   } = useDeckStore()
   
   const { awardStudyXP } = useGamificationStore()
   
-  const [currentCardIndex, setCurrentCardIndex] = useState(0)
+  // UI-specific state
   const [showAnswer, setShowAnswer] = useState(false)
-  const [studyCards, setStudyCards] = useState<Card[]>([])
   const [sessionComplete, setSessionComplete] = useState(false)
-  const [sessionStats, setSessionStats] = useState({
-    total: 0,
-    correct: 0,
-    incorrect: 0
-  })
   const [xpEarned, setXpEarned] = useState(0)
   const [sessionInitialized, setSessionInitialized] = useState(false)
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
+  const [currentCardIndex, setCurrentCardIndex] = useState(0)
+  const [stats, setStats] = useState({ total: 0, correct: 0, incorrect: 0 })
+
+  // Get the cards for the current study session
+  const studyCards = currentStudySession?.studyCards || []
 
   const deck = deckId ? getDeck(deckId) : null
-  const allCards = useMemo(() => deckId ? getCards(deckId) : [], [deckId, getCards])
 
+  // Sync local stats with session stats from the store
   useEffect(() => {
-    if (allCards.length > 0 && deckId && !sessionInitialized) {
-      // Check if there's an existing study session for this deck
-      const existingSession = getStudySession(deckId)
-      
-      if (existingSession) {
-        // Restore existing session
-        setStudyCards(existingSession.studyCards)
-        setCurrentCardIndex(existingSession.currentCardIndex)
-        setSessionStats({
-          total: existingSession.studyCards.length,
-          correct: existingSession.sessionStats.correct,
-          incorrect: existingSession.sessionStats.incorrect
-        })
-        console.log(`Restored study session: card ${existingSession.currentCardIndex + 1} of ${existingSession.studyCards.length}`)
-        console.log('Session stats:', existingSession.sessionStats)
+    if (currentStudySession?.sessionStats) {
+      setStats(currentStudySession.sessionStats)
+    }
+  }, [currentStudySession?.sessionStats])
+
+  // Effect to initialize the study session
+  useEffect(() => {
+    if (deckId && !sessionInitialized) {
+      // If there is no active session for this deck, start a new one.
+      if (!currentStudySession || currentStudySession.deckId !== deckId) {
+        const allCards = getCards(deckId)
+        if (allCards.length > 0) {
+          console.log('Starting a new study session...');
+          const dueCards = allCards.filter(card => {
+            if (card.reviewCount === 0) return true // New cards
+            return new Date(card.nextReview) <= new Date() // Due cards
+          })
+          const MAX_CARDS_PER_SESSION = 20
+          const cardsToStudy = (dueCards.length > 0 ? dueCards : allCards).slice(0, MAX_CARDS_PER_SESSION)
+          startStudySession(deckId, cardsToStudy)
+        }
       } else {
-        // Start new session
-        // Get cards that are due for review or new cards
-        const dueCards = allCards.filter(card => {
-          if (card.reviewCount === 0) return true // New cards
-          return new Date(card.nextReview) <= new Date() // Due cards
-        })
-        
-        // If no due cards, include all cards for practice
-        const cardsToStudy = dueCards.length > 0 ? dueCards : allCards
-        
-        setStudyCards(cardsToStudy)
-        setCurrentCardIndex(0)
-        setSessionStats({ total: cardsToStudy.length, correct: 0, incorrect: 0 })
-        
-        // Start new study session in store
-        startStudySession(deckId, cardsToStudy)
-        console.log(`Started new study session with ${cardsToStudy.length} cards`)
+        console.log('Restoring existing study session...');
       }
-      
-      // Mark session as initialized to prevent re-running
       setSessionInitialized(true)
     }
-  }, [deckId, startStudySession, sessionInitialized, getStudySession, allCards])
+  }, [deckId, getCards, startStudySession, currentStudySession, sessionInitialized])
 
-  const currentCard = studyCards[currentCardIndex]
+  // Get the current card using the new on-demand selector
+  const currentCard = useCurrentCard()
+
+  // Memoize session stats to prevent re-renders
+  const sessionStats = useMemo(() => currentStudySession?.sessionStats, [currentStudySession])
 
   // Keyboard shortcuts integration
   useStudyKeyboardShortcuts({
@@ -132,14 +125,14 @@ const StudyPage = () => {
 
     console.log(`\n=== CARD ${currentCardIndex + 1} ANSWER ===`)
     console.log(`Difficulty: ${difficulty}`)
-    console.log(`Current stats BEFORE update:`, sessionStats)
+    console.log(`Current stats BEFORE update:`, stats)
 
     // Calculate the new stats immediately
     // In spaced repetition: "again" = incorrect, "hard"/"good"/"easy" = correct
     const isIncorrect = difficulty === 'again'
     const newStats = isIncorrect
-      ? { ...sessionStats, incorrect: sessionStats.incorrect + 1 }
-      : { ...sessionStats, correct: sessionStats.correct + 1 }
+      ? { ...stats, incorrect: stats.incorrect + 1 }
+      : { ...stats, correct: stats.correct + 1 }
 
     console.log(`Answer "${difficulty}" is ${isIncorrect ? 'INCORRECT' : 'CORRECT'}`)
     console.log(`Calculated new stats:`, newStats)
@@ -148,7 +141,7 @@ const StudyPage = () => {
     // Force immediate state updates using flushSync to prevent batching issues
     flushSync(() => {
       // Update stats first to ensure they're displayed correctly
-      setSessionStats(newStats)
+      setStats(newStats)
       console.log(`Stats updated to:`, newStats)
     })
 
@@ -231,7 +224,7 @@ const StudyPage = () => {
       setSessionComplete(true)
       
       // Award XP for completing the study session
-      const totalCardsStudied = sessionStats.correct + sessionStats.incorrect + 1 // +1 for current card
+      const totalCardsStudied = stats.correct + stats.incorrect + 1 // +1 for current card
       const correctAnswers = newStats.correct
       
       // Calculate XP earned (same formula as in gamificationStore)
@@ -257,7 +250,7 @@ const StudyPage = () => {
     setCurrentCardIndex(0)
     setShowAnswer(false)
     setSessionComplete(false)
-    setSessionStats({ total: studyCards.length, correct: 0, incorrect: 0 })
+    setStats({ total: studyCards.length, correct: 0, incorrect: 0 })
     setXpEarned(0)
     
     // Clear existing session and start fresh
@@ -350,7 +343,7 @@ const StudyPage = () => {
     )
   }
 
-  if (!deck) {
+  if (!deck || !studyCards) {
     return (
       <div className="max-w-4xl mx-auto text-center py-12">
         <div className="text-6xl mb-4">❌</div>
@@ -381,8 +374,8 @@ const StudyPage = () => {
   }
 
   if (sessionComplete) {
-    const totalAnswered = sessionStats.correct + sessionStats.incorrect
-    const accuracy = totalAnswered > 0 ? Math.round((sessionStats.correct / totalAnswered) * 100) : 0
+    const totalAnswered = stats.correct + stats.incorrect
+    const accuracy = totalAnswered > 0 ? Math.round((stats.correct / totalAnswered) * 100) : 0
     
     return (
       <div className="max-w-4xl mx-auto text-center py-12">
@@ -401,11 +394,11 @@ const StudyPage = () => {
             </div>
             <div className="flex justify-between">
               <span>Correct:</span>
-              <span className="font-medium text-green-600">{sessionStats.correct}</span>
+              <span className="font-medium text-green-600">{stats.correct}</span>
             </div>
             <div className="flex justify-between">
               <span>Incorrect:</span>
-              <span className="font-medium text-red-600">{sessionStats.incorrect}</span>
+              <span className="font-medium text-red-600">{stats.incorrect}</span>
             </div>
             <div className="flex justify-between border-t pt-2">
               <span>Accuracy:</span>
@@ -479,60 +472,68 @@ const StudyPage = () => {
 
       {/* Flashcard */}
       <div className="card p-8 mb-8 min-h-[300px] flex flex-col justify-center">
-        <CardRenderer
-          card={currentCard}
-          showAnswer={showAnswer}
-        />
+        {currentCard ? (
+          <>
+            <CardRenderer
+              card={currentCard}
+              showAnswer={showAnswer}
+            />
 
-        {!showAnswer ? (
-          <div className="text-center mt-6">
-            <button
-              onClick={() => setShowAnswer(true)}
-              className="btn btn-primary btn-lg"
-            >
-              Show Answer
-              <span className="ml-2 text-xs opacity-75">(Space/Enter)</span>
-            </button>
-          </div>
+            {!showAnswer ? (
+              <div className="text-center mt-6">
+                <button
+                  onClick={() => setShowAnswer(true)}
+                  className="btn btn-primary btn-lg"
+                >
+                  Show Answer
+                  <span className="ml-2 text-xs opacity-75">(Space/Enter)</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4 mt-6">
+                <p className="text-gray-600 dark:text-gray-400 mb-6 text-center">
+                  How well did you know this?
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <button
+                    onClick={() => handleAnswer('again')}
+                    className="btn bg-red-500 hover:bg-red-600 text-white py-3"
+                  >
+                    <div className="text-sm font-medium">Again</div>
+                    <div className="text-xs opacity-80">&lt; 1 day</div>
+                    <div className="text-xs opacity-60 mt-1">1 or A</div>
+                  </button>
+                  <button
+                    onClick={() => handleAnswer('hard')}
+                    className="btn bg-orange-500 hover:bg-orange-600 text-white py-3"
+                  >
+                    <div className="text-sm font-medium">Hard</div>
+                    <div className="text-xs opacity-80">1-3 days</div>
+                    <div className="text-xs opacity-60 mt-1">2 or H</div>
+                  </button>
+                  <button
+                    onClick={() => handleAnswer('good')}
+                    className="btn bg-green-500 hover:bg-green-600 text-white py-3"
+                  >
+                    <div className="text-sm font-medium">Good</div>
+                    <div className="text-xs opacity-80">3-7 days</div>
+                    <div className="text-xs opacity-60 mt-1">3 or G</div>
+                  </button>
+                  <button
+                    onClick={() => handleAnswer('easy')}
+                    className="btn bg-blue-500 hover:bg-blue-600 text-white py-3"
+                  >
+                    <div className="text-sm font-medium">Easy</div>
+                    <div className="text-xs opacity-80">1+ weeks</div>
+                    <div className="text-xs opacity-60 mt-1">4 or E</div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="space-y-4 mt-6">
-            <p className="text-gray-600 dark:text-gray-400 mb-6 text-center">
-              How well did you know this?
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <button
-                onClick={() => handleAnswer('again')}
-                className="btn bg-red-500 hover:bg-red-600 text-white py-3"
-              >
-                <div className="text-sm font-medium">Again</div>
-                <div className="text-xs opacity-80">&lt; 1 day</div>
-                <div className="text-xs opacity-60 mt-1">1 or A</div>
-              </button>
-              <button
-                onClick={() => handleAnswer('hard')}
-                className="btn bg-orange-500 hover:bg-orange-600 text-white py-3"
-              >
-                <div className="text-sm font-medium">Hard</div>
-                <div className="text-xs opacity-80">1-3 days</div>
-                <div className="text-xs opacity-60 mt-1">2 or H</div>
-              </button>
-              <button
-                onClick={() => handleAnswer('good')}
-                className="btn bg-green-500 hover:bg-green-600 text-white py-3"
-              >
-                <div className="text-sm font-medium">Good</div>
-                <div className="text-xs opacity-80">3-7 days</div>
-                <div className="text-xs opacity-60 mt-1">3 or G</div>
-              </button>
-              <button
-                onClick={() => handleAnswer('easy')}
-                className="btn bg-blue-500 hover:bg-blue-600 text-white py-3"
-              >
-                <div className="text-sm font-medium">Easy</div>
-                <div className="text-xs opacity-80">1+ weeks</div>
-                <div className="text-xs opacity-60 mt-1">4 or E</div>
-              </button>
-            </div>
+          <div className="text-center">
+            <p className="text-gray-500">Loading card...</p>
           </div>
         )}
       </div>
@@ -547,8 +548,8 @@ const StudyPage = () => {
       {/* Session Stats */}
       <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
         <div>
-          Correct: <span className="text-green-600 font-medium">{sessionStats.correct}</span> |
-          Incorrect: <span className="text-red-600 font-medium">{sessionStats.incorrect}</span>
+          Correct: <span className="text-green-600 font-medium">{stats.correct}</span> |
+          Incorrect: <span className="text-red-600 font-medium">{stats.incorrect}</span>
         </div>
         <div className="flex gap-2">
           <button

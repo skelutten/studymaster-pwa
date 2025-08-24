@@ -9,6 +9,9 @@ interface CardRendererProps {
 }
 
 const CardRenderer: React.FC<CardRendererProps> = ({ card, showAnswer, onAnswerSubmit }) => {
+  if (!card) {
+    return null // or a loading indicator
+  }
   // Handle SVG map cards
   if (card.cardType.type === 'svg_map') {
     const options = card.cardType.options as SvgMapCardOptions

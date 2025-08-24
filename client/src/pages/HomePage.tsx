@@ -10,16 +10,21 @@ const HomePage = () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user } = useAuthStore()
 
-  // Get due cards for today
+  // Get due cards for today (capped per-deck to avoid overwhelming counts)
   const getDueDecks = () => {
-    return decks.map(deck => {
-      const deckCards = getCards(deck.id)
-      const dueCards = deckCards.filter(card => {
-        if (card.reviewCount === 0) return true // New cards
-        return new Date(card.nextReview) <= new Date() // Due cards
+    const DAILY_STUDY_LIMIT_PER_DECK = 20 // default cap; can be made configurable later
+    return decks
+      .map(deck => {
+        const deckCards = getCards(deck.id)
+        const dueCards = deckCards.filter(card => {
+          if (card.reviewCount === 0) return true // New cards
+          return new Date(card.nextReview) <= new Date() // Due cards
+        })
+        const dueCountRaw = dueCards.length
+        const dueCount = Math.min(dueCountRaw, DAILY_STUDY_LIMIT_PER_DECK)
+        return { ...deck, dueCount, dueCountRaw }
       })
-      return { ...deck, dueCount: dueCards.length }
-    }).filter(deck => deck.dueCount > 0)
+      .filter(deck => deck.dueCount > 0)
   }
 
   // Get recent achievements

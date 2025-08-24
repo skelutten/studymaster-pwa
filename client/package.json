@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^4.32.6",
+    "@types/recharts": "^1.8.29",
+    "axios": "^1.11.0",
     "chart.js": "^4.4.0",
     "clsx": "^2.0.0",
     "framer-motion": "^10.16.4",
@@ -24,6 +26,7 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.45.4",
     "react-router-dom": "^6.15.0",
+    "recharts": "^3.1.2",
     "sql.js": "^1.13.0",
     "tailwind-merge": "^1.14.0",
     "workbox-window": "^7.0.0",

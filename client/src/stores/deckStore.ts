@@ -6,7 +6,8 @@ import { createNewCard } from '../utils/cardDefaults'
 interface StudySession {
   deckId: string
   currentCardIndex: number
-  studyCards: Card[]
+  studyCards: Card[] // For in-memory access during a session
+  studyCardIds: string[] // For persistence
   sessionStats: {
     total: number
     correct: number
@@ -158,7 +159,12 @@ const parseApkgFile = async (file: File): Promise<{ name: string; cards: Array<{
 
     // Initialize SQL.js
     const SQL = await initSqlJs({
-      locateFile: (file) => `https://sql.js.org/dist/${file}`
+      locateFile: (file) => {
+        if (file.endsWith('.wasm')) {
+          return '/sql-wasm.wasm'
+        }
+        return `/${file}`
+      }
     })
 
     // Read the .apkg file as array buffer
@@ -566,6 +572,12 @@ export const useDeckStore = create<DeckStore>()(
             
             // Parse .apkg file using the new parser
             const { name, cards } = await parseApkgFile(file)
+
+            // Check if deck with the same name already exists
+            const existingDeck = get().decks.find(d => d.title === name);
+            if (existingDeck) {
+              throw new Error(`A deck named "${name}" already exists. Please rename the deck or the file before importing.`);
+            }
             
             setImportProgress(30, 'Creating deck...')
             
@@ -673,7 +685,7 @@ export const useDeckStore = create<DeckStore>()(
             const text = await file.text()
             
             // Detect separator
-            let separator = '\t'
+            let separator = '\t' // Corrected: 	 is a tab character
             if (fileName.endsWith('.csv')) {
               separator = ','
             }
@@ -1036,12 +1048,14 @@ export const useDeckStore = create<DeckStore>()(
       resetImportProgress: () => set({ importProgress: 0, importStatus: null }),
 
       // Study session functions
-      startStudySession: (deckId, studyCards) => {
+            startStudySession: (deckId, studyCards) => {
+        const studyCardIds = studyCards.map(c => c.id);
         set({
           currentStudySession: {
             deckId,
             currentCardIndex: 0,
-            studyCards,
+            studyCards, // Keep full cards for in-memory access
+            studyCardIds, // Add the IDs for persistence
             sessionStats: {
               total: studyCards.length,
               correct: 0,
@@ -1097,11 +1111,44 @@ export const useDeckStore = create<DeckStore>()(
     }),
     {
       name: 'deck-storage',
-      partialize: (state) => ({
-        decks: state.decks,
-        cards: state.cards,
-        currentStudySession: state.currentStudySession
-      })
+      // This function selects which parts of the state to save
+      partialize: (state) => {
+        // 1. Exclude the top-level 'cards' object entirely.
+        // 2. From the 'currentStudySession', exclude the 'studyCards' array of full objects.
+        const { cards, currentStudySession, ...restOfState } = state;
+
+        const sessionToPersist = currentStudySession
+          ? {
+              deckId: currentStudySession.deckId,
+              currentCardIndex: currentStudySession.currentCardIndex,
+              studyCardIds: currentStudySession.studyCardIds, // Only persist the IDs
+              sessionStats: currentStudySession.sessionStats,
+              startedAt: currentStudySession.startedAt,
+            }
+          : null;
+
+        // Return a new object containing only the data we want to persist.
+        // Note: `decks` are preserved via `restOfState`.
+        return { ...restOfState, currentStudySession: sessionToPersist };
+      },
     }
   )
 )
+
+export const useCurrentCard = (): Card | null => {
+  const store = useDeckStore();
+  const session = store.currentStudySession;
+
+  if (!session || !session.studyCardIds || session.studyCardIds.length === 0) {
+    return null;
+  }
+
+  const currentCardId = session.studyCardIds[session.currentCardIndex];
+  if (!currentCardId) {
+    return null;
+  }
+
+  // The full, non-persisted `cards` object holds all cards for the current deck.
+  const deckCards = store.cards[session.deckId] || [];
+  return deckCards.find(card => card.id === currentCardId) || null;
+};

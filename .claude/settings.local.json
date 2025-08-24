@@ -2,6 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(cat:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(curl:*)",
+      "Bash(echo:*)",
+      "Bash(nc:*)",
       "Bash(cp:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
@@ -72,7 +77,11 @@
       "Bash(npm:*)",
       "Bash(npx -y @smithery/cli@latest run @upstash/context7-mcp --key 46a9c7d3-eacd-420a-af4f-1237fb7a2c4a --profile reliable-herring-NYU8AO --help)",
       "Bash(npx -y @smithery/cli@latest run @upstash/context7-mcp --key 46a9c7d3-eacd-420a-af4f-1237fb7a2c4a --profile reliable-herring-NYU8AO)",
-      "Bash(npx:*)"
+      "Bash(npx:*)",
+      "Bash(npx -y @smithery/cli@latest run @upstash/context7-mcp --key 46a9c7d3-eacd-420a-af4f-1237fb7a2c4a --profile reliable-herring-NYU8AO --help)",
+      "Bash(npx:*)",
+      "Bash(fuser:*)",
+      "Bash(kill:*)"
     ],
     "deny": []
   }
