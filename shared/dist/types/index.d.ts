@@ -491,6 +491,23 @@ export interface Notification {
     createdAt: string;
 }
 export type NotificationType = 'achievement_earned' | 'challenge_completed' | 'streak_reminder' | 'friend_request' | 'study_reminder' | 'deck_shared' | 'monthly_challenge_started' | 'story_chapter_unlocked' | 'milestone_reached' | 'community_goal_achieved' | 'leaderboard_position_changed';
+export * from './enhanced-types';
+export interface Card {
+    difficulty?: number;
+    stability?: number;
+    retrievability?: number;
+    fsrsParameters?: number[];
+    performanceHistory?: any[];
+    averageResponseTime?: number;
+    cognitiveLoadIndex?: number;
+    confidenceLevel?: 'building' | 'optimal' | 'struggling';
+    conceptSimilarity?: string[];
+    lastClusterReview?: string;
+    contextualDifficulty?: Record<string, any>;
+    stabilityTrend?: 'increasing' | 'decreasing' | 'stable';
+    retrievabilityHistory?: number[];
+    optimalInterval?: number;
+}
 export declare const CardStateUtils: {
     /**
      * Determine if a review card is young (interval < 21 days) or mature (interval >= 21 days)

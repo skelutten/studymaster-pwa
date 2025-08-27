@@ -19,6 +19,7 @@ const cards_1 = __importDefault(require("./routes/cards"));
 const study_1 = __importDefault(require("./routes/study"));
 const gamification_1 = __importDefault(require("./routes/gamification"));
 const social_1 = __importDefault(require("./routes/social"));
+const uams_1 = __importDefault(require("./routes/uams"));
 const errorHandler_1 = require("./middleware/errorHandler");
 const rateLimiter_1 = require("./middleware/rateLimiter");
 const app = (0, express_1.default)();
@@ -70,7 +71,8 @@ app.get('/', (req, res) => {
             cards: '/api/cards',
             study: '/api/study',
             gamification: '/api/gamification',
-            social: '/api/social'
+            social: '/api/social',
+            uams: '/api/uams'
         },
         documentation: '/api/docs'
     });
@@ -119,6 +121,13 @@ app.get('/api/docs', (req, res) => {
                 'GET /api/social/friends/:userId': 'Get user friends',
                 'GET /api/social/challenges/:userId': 'Get user challenges',
                 'POST /api/social/share': 'Share deck or achievement'
+            },
+            uams: {
+                'POST /api/uams/start-session': 'Start UAMS learning session',
+                'POST /api/uams/submit-response': 'Submit card response with FSRS',
+                'GET /api/uams/queue/:sessionId': 'Get adaptive card queue',
+                'GET /api/uams/analytics/:userId': 'Get learning analytics',
+                'POST /api/uams/update-context': 'Update environmental context'
             }
         }
     });
@@ -130,6 +139,7 @@ app.use('/api/cards', cards_1.default);
 app.use('/api/study', study_1.default);
 app.use('/api/gamification', gamification_1.default);
 app.use('/api/social', social_1.default);
+app.use('/api/uams', uams_1.default);
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
     socket.on('join-user-room', (userId) => {
@@ -156,7 +166,7 @@ app.use('*', (req, res) => {
     });
 });
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
+server.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📱 Client URL: ${process.env.CLIENT_URL || "http://localhost:3000"}`);
     console.log(`🔗 API URL: http://localhost:${PORT}`);

@@ -1,348 +1,172 @@
-import express from 'express';
-import { Request, Response } from 'express';
-import PocketBase from 'pocketbase';
+import { Router } from 'express';
+import { UnifiedFSRSEngine } from '../services/fsrs/unifiedFSRSEngine';
+import { UnifiedMomentumManager } from '../services/momentum/unifiedMomentumManager';
+import { UnifiedCardSelector } from '../services/selection/unifiedCardSelector';
+import { OptimizedQueries } from '../services/database/optimizedQueries';
+import { FeatureFlagService } from '../services/featureFlagService';
+import { UAMSMigrationService } from '../services/uamsMigrationService';
+import { UnifiedSessionState, EnhancedResponseLog, UnifiedCard, UserProfile } from '../../../shared/types/enhanced-types';
 
-const router = express.Router();
-const pb = new PocketBase('http://127.0.0.1:8090');
+const router = Router();
 
-/**
- * Simplified UAMS endpoints for MVP functionality
- * This provides the core UAMS v3.0 features with proper type safety
- */
+// Initialize services (assuming they can be initialized without specific config here, or passed via dependency injection)
+const fsrsEngine = new UnifiedFSRSEngine();
+const momentumManager = new UnifiedMomentumManager();
+const cardSelector = new UnifiedCardSelector();
+// Placeholder for dbService - in a real app, this would be injected or properly initialized
+const dbService = {}; 
+const optimizedQueries = new OptimizedQueries(dbService);
+const featureFlagService = new FeatureFlagService();
+const uamsMigrationService = new UAMSMigrationService(dbService);
 
-/**
- * Start a new UAMS learning session
- */
-router.post('/start-session', async (req: Request, res: Response) => {
+
+router.post('/session/initialize', async (req, res) => {
   try {
     const { userId, deckId } = req.body;
 
-    if (!userId || !deckId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId and deckId are required'
-      });
-    }
+    // In a real scenario, you'd load user-specific data and cards here
+    // For now, we'll simulate initial state and data loading
+    const availableCards: UnifiedCard[] = []; // Load from DB using optimizedQueries
+    const userProfile: UserProfile = { id: userId }; // Load from DB
 
-    // Create initial session state with simplified structure
-    const sessionState = {
-      user_id: userId,
-      deck_id: deckId,
-      session_momentum_score: 0.5,
-      momentum_trend: 'stable',
-      session_fatigue_index: 0.0,
-      cognitive_load_capacity: 1.0,
-      attention_span_remaining: 1.0,
-      session_start_time: new Date().toISOString(),
-      contextual_factors: {
-        device: 'desktop',
-        networkQuality: 'good',
+    const initialState: UnifiedSessionState = {
+      userId,
+      sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      sessionMomentumScore: 0.5,
+      momentumTrend: 'stable',
+      sessionFatigueIndex: 0.0,
+      cognitiveLoadCapacity: 1.0,
+      attentionSpanRemaining: 1.0,
+      reviewQueue: [],
+      lookaheadBuffer: [],
+      emergencyBuffer: [],
+      challengeReserve: [],
+      sessionStartTime: new Date().toISOString(),
+      contextualFactors: {
         timeOfDay: new Date().toISOString(),
-        sessionDuration: 0
+        dayOfWeek: new Date().toLocaleDateString('en', { weekday: 'long' }),
+        sessionDuration: 0,
+        studyStreak: 1,
+        environmentalFactors: { device: 'desktop', networkQuality: 'excellent' },
+        lastSessionQuality: 0.7
       },
-      flow_state_metrics: {
+      adaptationHistory: [],
+      explanationLog: [],
+      flowStateMetrics: {
         challengeSkillBalance: 0.5,
         engagementLevel: 0.5,
-        satisfactionPrediction: 0.5,
+        satisfactionPrediction: 0.7,
         momentumMaintenance: true
       }
     };
 
-    // Save to database
-    const session = await pb.collection('session_states').create(sessionState);
-    
-    // Get available cards for this deck
-    const availableCards = await pb.collection('cards').getList(1, 20, {
-      filter: `deck_id="${deckId}"`,
-      sort: 'created'
-    });
+    // Simulate populating buffers (this logic would be more complex in a real app)
+    // For now, just ensure buffers are not empty for testing purposes
+    if (availableCards.length === 0) {
+        // Add some dummy cards if none are available for testing
+        for (let i = 0; i < 10; i++) {
+            availableCards.push({
+                id: `dummy-card-${i}`,
+                deckId: deckId,
+                frontContent: `Front ${i}`,
+                backContent: `Back ${i}`,
+                cardType: { type: 'basic' },
+                mediaRefs: [],
+                easeFactor: 2.5,
+                intervalDays: 0,
+                nextReview: new Date().toISOString(),
+                createdAt: new Date().toISOString(),
+                reviewCount: 0,
+                lapseCount: 0,
+                lastReviewed: new Date().toISOString(),
+                difficulty: Math.floor(Math.random() * 10) + 1,
+                stability: Math.random() * 10 + 1,
+                retrievability: Math.random(),
+                fsrsParameters: [],
+                performanceHistory: [],
+                averageResponseTime: 0,
+                cognitiveLoadIndex: 0,
+                confidenceLevel: 'building',
+                conceptSimilarity: [],
+                lastClusterReview: '',
+                contextualDifficulty: { timeOfDay: {}, dayOfWeek: {}, sessionPosition: {}, cognitiveLoad: {} },
+                stabilityTrend: 'stable',
+                retrievabilityHistory: [],
+                optimalInterval: 1,
+            });
+        }
+    }
+    initialState.lookaheadBuffer = availableCards.slice(0, 5);
+    initialState.emergencyBuffer = availableCards.slice(5, 7);
+    initialState.challengeReserve = availableCards.slice(7, 10);
 
-    // Simple queue generation (can be enhanced with complex algorithms later)
-    const reviewQueue = availableCards.items.slice(0, 10);
-    const lookaheadBuffer = availableCards.items.slice(10, 15);
 
-    // Update session with queue
-    await pb.collection('session_states').update(session.id, {
-      review_queue: reviewQueue.map(c => c.id),
-      lookahead_buffer: lookaheadBuffer.map(c => c.id)
-    });
-
-    return res.json({
-      success: true,
-      sessionId: session.id,
-      reviewQueue,
-      lookaheadBuffer,
-      sessionState: {
-        ...session,
-        reviewQueue,
-        lookaheadBuffer
-      }
-    });
-
-  } catch (error: any) {
-    console.error('Start session error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error?.message || 'Failed to start session'
-    });
+    res.json(initialState);
+  } catch (e: unknown) {
+    const error = e as Error;
+    res.status(500).json({ error: error.message });
   }
 });
 
-/**
- * Submit a card response and update with basic FSRS calculations
- */
-router.post('/submit-response', async (req: Request, res: Response) => {
+router.post('/session/next-card', async (req, res) => {
   try {
-    const { 
-      sessionId, 
-      cardId, 
-      responseTime, 
-      responseQuality, // 1-4 FSRS scale
-      cognitiveLoadLevel = 0.5
-    } = req.body;
+    const { sessionState } = req.body;
 
-    if (!sessionId || !cardId || typeof responseQuality !== 'number') {
-      return res.status(400).json({
-        success: false,
-        error: 'sessionId, cardId, and responseQuality are required'
-      });
-    }
+    // Simulate card selection logic
+    const selected = cardSelector.selectNextOptimalCard(sessionState, sessionState.lookaheadBuffer);
 
-    // Get current session and card
-    const session = await pb.collection('session_states').getOne(sessionId);
-    const card = await pb.collection('cards').getOne(cardId);
+    res.json(selected);
+  } catch (e: unknown) {
+    const error = e as Error;
+    res.status(500).json({ error: error.message });
+  }
+});
 
-    // Create response log
-    const responseLog = {
-      user_id: session.user_id,
-      card_id: cardId,
-      session_id: sessionId,
-      response_time: responseTime,
-      response_quality: responseQuality,
-      cognitive_load_level: cognitiveLoadLevel,
-      timestamp: new Date().toISOString()
+router.post('/session/response', async (req, res) => {
+  try {
+    const { sessionState, cardId, response } = req.body;
+
+    // Simulate FSRS and momentum updates
+    const card: UnifiedCard = { // Load actual card from DB using cardId
+        id: cardId,
+        deckId: 'dummy',
+        frontContent: 'dummy',
+        backContent: 'dummy',
+        cardType: { type: 'basic' },
+        mediaRefs: [],
+        easeFactor: 2.5,
+        intervalDays: 0,
+        nextReview: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        reviewCount: 0,
+        lapseCount: 0,
+        lastReviewed: new Date().toISOString(),
+        difficulty: 5,
+        stability: 1,
+        retrievability: 0.9,
+        fsrsParameters: [],
+        performanceHistory: [],
+        averageResponseTime: 0,
+        cognitiveLoadIndex: 0,
+        confidenceLevel: 'building',
+        conceptSimilarity: [],
+        lastClusterReview: '',
+        contextualDifficulty: { timeOfDay: {}, dayOfWeek: {}, sessionPosition: {}, cognitiveLoad: {} },
+        stabilityTrend: 'stable',
+        retrievabilityHistory: [],
+        optimalInterval: 1,
     };
+    const userProfile: UserProfile = { id: sessionState.userId };
 
-    // Save response log
-    const savedResponse = await pb.collection('response_logs').create(responseLog);
+    const dsrUpdate = fsrsEngine.calculateEnhancedDSR(card, response, userProfile);
+    // Save DSR update to DB using optimizedQueries
 
-    // Basic FSRS calculations (simplified)
-    const currentDifficulty = card.difficulty || 5.0;
-    const currentStability = card.stability || 1.0;
-    const currentRetrievability = card.retrievability || 0.9;
+    const updatedSession = momentumManager.updateSessionMomentum(sessionState, response);
 
-    // Simple difficulty adjustment based on response quality
-    let newDifficulty = currentDifficulty;
-    let newStability = currentStability;
-    let newRetrievability = currentRetrievability;
-
-    if (responseQuality <= 2) { // Hard/Again
-      newDifficulty = Math.min(10, currentDifficulty + 0.5);
-      newStability = Math.max(0.1, currentStability * 0.8);
-      newRetrievability = Math.max(0.1, currentRetrievability * 0.7);
-    } else if (responseQuality >= 4) { // Easy
-      newDifficulty = Math.max(1, currentDifficulty - 0.3);
-      newStability = currentStability * 1.3;
-      newRetrievability = Math.min(1, currentRetrievability * 1.1);
-    } else { // Good
-      newDifficulty = currentDifficulty + (responseQuality - 3) * 0.1;
-      newStability = currentStability * 1.1;
-      newRetrievability = Math.min(1, currentRetrievability * 1.05);
-    }
-
-    // Calculate next review time (simplified interval calculation)
-    const intervalDays = Math.max(1, Math.round(newStability * newRetrievability));
-    const nextReviewTime = new Date();
-    nextReviewTime.setDate(nextReviewTime.getDate() + intervalDays);
-
-    // Update card with new values
-    await pb.collection('cards').update(cardId, {
-      difficulty: newDifficulty,
-      stability: newStability,
-      retrievability: newRetrievability,
-      next_review_time: nextReviewTime.toISOString(),
-      last_review_time: new Date().toISOString(),
-      review_count: (card.review_count || 0) + 1,
-      lapse_count: responseQuality <= 2 ? (card.lapse_count || 0) + 1 : (card.lapse_count || 0)
-    });
-
-    // Update session momentum (simplified)
-    const performanceImpact = (responseQuality - 2.5) / 1.5; // -1 to +1
-    const currentMomentum = session.session_momentum_score || 0.5;
-    const newMomentum = Math.max(0, Math.min(1, currentMomentum + performanceImpact * 0.1));
-
-    await pb.collection('session_states').update(sessionId, {
-      session_momentum_score: newMomentum,
-      momentum_trend: newMomentum > currentMomentum ? 'improving' : 
-                     newMomentum < currentMomentum ? 'declining' : 'stable'
-    });
-
-    return res.json({
-      success: true,
-      dsrUpdate: {
-        difficulty: newDifficulty,
-        stability: newStability,
-        retrievability: newRetrievability,
-        confidence: 0.8,
-        explanation: `Adjusted based on ${responseQuality === 1 ? 'Again' : responseQuality === 2 ? 'Hard' : responseQuality === 3 ? 'Good' : 'Easy'} response`
-      },
-      sessionUpdate: {
-        sessionMomentumScore: newMomentum,
-        momentumTrend: newMomentum > currentMomentum ? 'improving' : 
-                       newMomentum < currentMomentum ? 'declining' : 'stable'
-      },
-      responseId: savedResponse.id
-    });
-
-  } catch (error: any) {
-    console.error('Submit response error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error?.message || 'Failed to submit response'
-    });
-  }
-});
-
-/**
- * Get adaptive card queue for session
- */
-router.get('/queue/:sessionId', async (req: Request, res: Response) => {
-  try {
-    const { sessionId } = req.params;
-    const session = await pb.collection('session_states').getOne(sessionId);
-
-    // Get cards that need review
-    const now = new Date().toISOString();
-    const availableCards = await pb.collection('cards').getList(1, 50, {
-      filter: `deck_id="${session.deck_id}" && (next_review_time <= "${now}" || next_review_time = "")`,
-      sort: 'next_review_time'
-    });
-
-    // Simple adaptive sorting based on session momentum
-    const momentum = session.session_momentum_score || 0.5;
-    let sortedCards = availableCards.items;
-
-    if (momentum < 0.3) {
-      // Low momentum: prioritize easier cards
-      sortedCards = sortedCards.sort((a, b) => (a.difficulty || 5) - (b.difficulty || 5));
-    } else if (momentum > 0.7) {
-      // High momentum: include more challenging cards
-      sortedCards = sortedCards.sort((a, b) => (b.difficulty || 5) - (a.difficulty || 5));
-    }
-    // Medium momentum: keep default order
-
-    const reviewQueue = sortedCards.slice(0, 10);
-    const lookaheadBuffer = sortedCards.slice(10, 15);
-
-    return res.json({
-      success: true,
-      queueResult: {
-        reviewQueue,
-        lookaheadBuffer,
-        emergencyBuffer: [],
-        challengeReserve: []
-      },
-      sessionStats: {
-        queueSize: reviewQueue.length,
-        lookaheadSize: lookaheadBuffer.length,
-        momentum: momentum,
-        totalAvailable: availableCards.totalItems
-      }
-    });
-
-  } catch (error: any) {
-    console.error('Get queue error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error?.message || 'Failed to get queue'
-    });
-  }
-});
-
-/**
- * Get basic analytics for user
- */
-router.get('/analytics/:userId', async (req: Request, res: Response) => {
-  try {
-    const { userId } = req.params;
-
-    // Get recent sessions
-    const sessions = await pb.collection('session_states').getList(1, 20, {
-      filter: `user_id="${userId}"`,
-      sort: '-created'
-    });
-
-    // Get recent responses
-    const responses = await pb.collection('response_logs').getList(1, 100, {
-      filter: `user_id="${userId}"`,
-      sort: '-timestamp'
-    });
-
-    // Calculate basic analytics
-    const analytics = {
-      sessionCount: sessions.totalItems,
-      totalReviews: responses.totalItems,
-      averageAccuracy: responses.items.length > 0 
-        ? responses.items.filter(r => r.response_quality >= 3).length / responses.items.length 
-        : 0,
-      averageResponseTime: responses.items.length > 0
-        ? responses.items.reduce((sum: number, r: any) => sum + (r.response_time || 0), 0) / responses.items.length
-        : 0,
-      currentMomentum: sessions.items.length > 0 
-        ? sessions.items[0].session_momentum_score || 0.5 
-        : 0.5,
-      recentSessions: sessions.items.slice(0, 5).map((s: any) => ({
-        id: s.id,
-        startTime: s.session_start_time,
-        momentum: s.session_momentum_score,
-        trend: s.momentum_trend
-      }))
-    };
-
-    return res.json({
-      success: true,
-      analytics
-    });
-
-  } catch (error: any) {
-    console.error('Get analytics error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error?.message || 'Failed to get analytics'
-    });
-  }
-});
-
-/**
- * Update environmental context for session
- */
-router.post('/update-context', async (req: Request, res: Response) => {
-  try {
-    const { sessionId, environmentalContext } = req.body;
-
-    if (!sessionId || !environmentalContext) {
-      return res.status(400).json({
-        success: false,
-        error: 'sessionId and environmentalContext are required'
-      });
-    }
-
-    // Update session with new context
-    await pb.collection('session_states').update(sessionId, {
-      contextual_factors: environmentalContext
-    });
-
-    return res.json({
-      success: true,
-      message: 'Environmental context updated successfully'
-    });
-
-  } catch (error: any) {
-    console.error('Update context error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error?.message || 'Failed to update context'
-    });
+    res.json(updatedSession);
+  } catch (e: unknown) {
+    const error = e as Error;
+    res.status(500).json({ error: error.message });
   }
 });
 

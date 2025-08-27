@@ -146,7 +146,7 @@ Complete overview of all StudyMaster PWA features and capabilities.
 
 - [Getting Started](../getting-started/README.md) - Quick start guide
 - [Development](../development/README.md) - Technical implementation details
-- [API Documentation](../development/api.md) - Complete API reference
+
 
 ---
 

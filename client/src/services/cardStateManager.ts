@@ -87,7 +87,9 @@ export class CardStateManager {
       errors.push('Interval (ivl) must be a non-negative number')
     }
 
-    if (typeof card.factor !== 'number' || card.factor < 1300 || card.factor > 5000) {
+    if (typeof card.factor !== 'number') {
+      errors.push('Ease factor must be a number')
+    } else if (card.factor < 1300 || card.factor > 5000) {
       warnings.push(`Ease factor (${card.factor}) is outside normal range (1300-5000)`)
     }
 
@@ -138,15 +140,11 @@ export class CardStateManager {
     }
 
     // Date validation
-    try {
-      new Date(card.createdAt)
-    } catch {
+    if (isNaN(new Date(card.createdAt).getTime())) {
       errors.push('Invalid createdAt date format')
     }
 
-    try {
-      new Date(card.nextReview)
-    } catch {
+    if (isNaN(new Date(card.nextReview).getTime())) {
       errors.push('Invalid nextReview date format')
     }
 

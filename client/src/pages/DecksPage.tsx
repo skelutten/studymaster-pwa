@@ -4,9 +4,10 @@ import { useDeckStore } from '../stores/deckStore'
 import { Deck, DeckSettings } from '../../../shared/types'
 import CardManager from '../components/deck/CardManager'
 import ProgressBar from '../components/ui/ProgressBar'
-import { generateMapDeck, availableMaps } from '../utils/svgMapGenerator'
+
 
 const DecksPage = () => {
+  // Main DecksPage component
   const navigate = useNavigate()
   const {
     decks,
@@ -26,13 +27,61 @@ const DecksPage = () => {
     addCard
   } = useDeckStore()
 
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
+  
+  
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [managingDeckId, setManagingDeckId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  console.log('DecksPage: showCreateModal state initialized:', showCreateModal)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [showMapModal, setShowMapModal] = useState(false)
-  const [selectedMapType, setSelectedMapType] = useState<string>('')
+  const [selectedMapType, setSelectedMapType] = useState('')
+  
+  // Available maps for geography deck creation
+  const availableMaps = [
+    {
+      id: 'world-countries',
+      name: 'World Countries',
+      description: 'Learn all countries of the world',
+      emoji: '🌍',
+      regions: [
+        'United States', 'Canada', 'Mexico', 'Brazil', 'Argentina', 'United Kingdom', 
+        'France', 'Germany', 'Italy', 'Spain', 'Russia', 'China', 'Japan', 'India',
+        'Australia', 'South Africa', 'Egypt', 'Nigeria', 'Kenya', 'Morocco'
+      ]
+    },
+    {
+      id: 'us-states',
+      name: 'US States',
+      description: 'Learn all 50 US states',
+      emoji: '🇺🇸',
+      regions: [
+        'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
+        'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa',
+        'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan',
+        'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire',
+        'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio',
+        'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+        'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia',
+        'Wisconsin', 'Wyoming'
+      ]
+    },
+    {
+      id: 'europe',
+      name: 'European Countries',
+      description: 'Learn countries in Europe',
+      emoji: '🇪🇺',
+      regions: [
+        'Albania', 'Andorra', 'Austria', 'Belarus', 'Belgium', 'Bosnia and Herzegovina',
+        'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia', 'Finland',
+        'France', 'Germany', 'Greece', 'Hungary', 'Iceland', 'Ireland', 'Italy', 'Latvia',
+        'Liechtenstein', 'Lithuania', 'Luxembourg', 'Malta', 'Moldova', 'Monaco', 'Montenegro',
+        'Netherlands', 'North Macedonia', 'Norway', 'Poland', 'Portugal', 'Romania', 'San Marino',
+        'Serbia', 'Slovakia', 'Slovenia', 'Spain', 'Sweden', 'Switzerland', 'Ukraine', 'United Kingdom', 'Vatican City'
+      ]
+    }
+  ]
 
   // Form states
   const [newDeckTitle, setNewDeckTitle] = useState('')
@@ -149,38 +198,49 @@ const DecksPage = () => {
   }
 
   const handleCreateMapDeck = async () => {
-    if (!selectedMapType) return
-    
+    const selectedMap = availableMaps.find(map => map.id === selectedMapType)
+    if (!selectedMap) return
+
     try {
-      // Create wrapper function to match expected signature
-      const createDeckWrapper = async (deckData: { userId: string; title: string; description: string; settings: DeckSettings; category?: string; isPublic: boolean; cardCount?: number }) => {
-        // Convert DeckData to Deck format
-        const deckInput = {
-          userId: deckData.userId,
-          title: deckData.title,
-          description: deckData.description,
-          settings: deckData.settings,
-          category: deckData.category || 'geography',
-          isPublic: deckData.isPublic,
-          cardCount: deckData.cardCount || 0
-        }
-        const result = await createDeck(deckInput)
-        // Convert back to DeckData format
-        return {
-          ...deckData,
-          id: result.id
-        }
+      const deck = await createDeck({
+        userId: 'current-user',
+        title: selectedMap.name,
+        description: selectedMap.description,
+        cardCount: selectedMap.regions.length,
+        isPublic: false,
+        settings: {
+          newCardsPerDay: 20,
+          maxReviewsPerDay: 100,
+          easyBonus: 1.3,
+          intervalModifier: 1.0,
+          maximumInterval: 36500,
+          minimumInterval: 1
+        },
+        category: 'geography'
+      })
+
+      // Create cards for each region
+      for (const region of selectedMap.regions) {
+        await addCard({
+          deckId: deck.id,
+          front: `What is this region? [Map: ${selectedMap.id}]`,
+          back: region,
+          reviewCount: 0,
+          easeFactor: 2.5,
+          interval: 0,
+          nextReview: new Date(),
+          lastReviewed: new Date()
+        })
       }
-      
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const deck = await generateMapDeck(selectedMapType, createDeckWrapper as any)
-      console.log(`Successfully created ${selectedMapType} map deck:`, deck)
+
       setShowMapModal(false)
       setSelectedMapType('')
     } catch (error) {
       console.error('Failed to create map deck:', error)
     }
   }
+
+  
 
   return (
     <div className="space-y-6">
@@ -192,7 +252,14 @@ const DecksPage = () => {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              console.log('Create deck button clicked')
+              if (typeof setShowCreateModal === 'function') {
+                setShowCreateModal(true)
+              } else {
+                console.error('setShowCreateModal is not a function')
+              }
+            }}
             className="btn btn-primary"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -200,15 +267,7 @@ const DecksPage = () => {
             </svg>
             Create Deck
           </button>
-          <button
-            onClick={() => setShowMapModal(true)}
-            className="btn btn-success"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-            </svg>
-            Map Deck
-          </button>
+          
           <button
             onClick={() => setShowImportModal(true)}
             className="btn btn-secondary"
@@ -371,7 +430,7 @@ const DecksPage = () => {
       )}
 
       {/* Create Deck Modal */}
-      {showCreateModal && (
+      {(typeof showCreateModal !== 'undefined' && showCreateModal) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Create New Deck</h2>
@@ -532,7 +591,7 @@ const DecksPage = () => {
         </div>
       )}
 
-      {/* SVG Map Modal */}
+      
       {showMapModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">

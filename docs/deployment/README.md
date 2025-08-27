@@ -14,8 +14,7 @@ vercel --prod
 
 **Environment Variables to set in Vercel Dashboard:**
 - `VITE_API_URL` = `https://your-server-deployment-url.vercel.app`
-- `VITE_SUPABASE_URL` = `https://your-project-id.supabase.co`
-- `VITE_SUPABASE_ANON_KEY` = `your-supabase-anon-key-here`
+
 
 ### 2. Server Deployment (Vercel)
 ```bash
@@ -26,11 +25,7 @@ vercel --prod
 
 **Environment Variables to set in Vercel Dashboard:**
 - `NODE_ENV` = `production`
-- `POSTGRES_URL` = `postgres://postgres.your-project-id:your-db-password@aws-0-region.pooler.supabase.com:6543/postgres?sslmode=require`
-- `SUPABASE_URL` = `https://your-project-id.supabase.co`
-- `SUPABASE_ANON_KEY` = `your-supabase-anon-key-here`
-- `SUPABASE_SERVICE_ROLE_KEY` = `your-supabase-service-role-key-here`
-- `SUPABASE_JWT_SECRET` = `your-supabase-jwt-secret-here`
+
 
 ## Security Best Practices
 
@@ -56,7 +51,7 @@ cd server && vercel --prod
 
 1. Check client deployment loads at Vercel URL
 2. Verify API endpoints respond correctly
-3. Test authentication with Supabase
+
 4. Confirm database connectivity
 5. Test all major features work in production
 
@@ -75,8 +70,7 @@ cd server && vercel --prod
 ## Related Guides
 
 - [Security Configuration](../security/README.md) - Security best practices
-- [Environment Variables](environment-variables.md) - Complete variable reference
-- [Troubleshooting Deployment](troubleshooting.md) - Common deployment issues
+
 
 ---
 

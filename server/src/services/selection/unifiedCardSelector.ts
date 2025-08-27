@@ -573,6 +573,33 @@ export class UnifiedCardSelector {
     return isNovel || hasMultimedia || isSpecialType;
   }
 
+  private calculateEngagementScore(card: UnifiedCard, session: UnifiedSessionState): number {
+    let score = 0;
+    
+    // Novelty factor (higher score for cards not seen recently)
+    const recentCardIds = session.adaptationHistory.slice(-10).map(a => a.cardId);
+    const isNovel = !recentCardIds.includes(card.id);
+    if (isNovel) score += 0.3;
+    
+    // Content variety bonus
+    const hasMultimedia = card.mediaRefs && card.mediaRefs.length > 0;
+    if (hasMultimedia) score += 0.2;
+    
+    // Special card type bonus
+    const isSpecialType = card.cardType && card.cardType.type !== 'basic';
+    if (isSpecialType) score += 0.15;
+    
+    // Retrievability factor (prefer cards with good success chance)
+    score += card.retrievability * 0.25;
+    
+    // Difficulty balance (prefer moderate difficulty for engagement)
+    const optimalDifficulty = 5.0;
+    const difficultyPenalty = Math.abs(card.difficulty - optimalDifficulty) / 10;
+    score -= difficultyPenalty * 0.1;
+    
+    return Math.max(0, score);
+  }
+
   private calculateConsistency(ratings: string[]): number {
     if (ratings.length < 2) return 1.0;
     
