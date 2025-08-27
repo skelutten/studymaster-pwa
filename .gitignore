@@ -18,6 +18,11 @@ node_modules
 *.rej
 *.coverage
 .vercel
+.roo
+.claude
+.vscode
+PRPs
+reports
 
 # API keys and sensitive data
 vercel.json.production

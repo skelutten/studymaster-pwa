@@ -24,7 +24,7 @@ npm run dev
 
 - **Client (React/Vite)**: http://localhost:3000
 - **Server (Express API)**: http://localhost:3001
-- **API Documentation**: http://localhost:3001/api/docs
+
 - **Health Check**: http://localhost:3001/health
 
 ## Available Scripts
@@ -153,9 +153,7 @@ studymaster-pwa/
 ## Related Guides
 
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
-- [Architecture](architecture.md) - System architecture overview
-- [Testing](testing.md) - Testing guidelines and setup
-- [Code Style](code-style.md) - Coding standards and conventions
+
 
 ---
 

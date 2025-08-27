@@ -31,7 +31,7 @@ Welcome to the complete documentation for StudyMaster PWA! This documentation is
 **Security configuration** and credential management.
 - Environment variable security
 - API key management
-- Supabase setup and configuration
+
 - Git security best practices
 - Authentication and authorization
 
@@ -77,19 +77,13 @@ Welcome to the complete documentation for StudyMaster PWA! This documentation is
 ### For Deployment
 1. **[Security Setup](security/README.md)** - Configure credentials securely
 2. **[Deployment Guide](deployment/README.md)** - Deploy to production
-3. **[Environment Variables](deployment/environment-variables.md)** - Configure all variables
+
 
 ### For Understanding Features
 1. **[Features Overview](features/README.md)** - Complete feature documentation
-2. **[Architecture Guide](development/architecture.md)** - System architecture
-3. **[API Documentation](development/api.md)** - API reference
 
-## 📞 Need Help?
 
-- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
-- **Email**: support@studymaster.app
-- **Community**: Join our Discord server
+
 
 ## 📝 Documentation Guidelines
 

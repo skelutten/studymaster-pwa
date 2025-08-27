@@ -81,7 +81,15 @@
       "Bash(npx -y @smithery/cli@latest run @upstash/context7-mcp --key 46a9c7d3-eacd-420a-af4f-1237fb7a2c4a --profile reliable-herring-NYU8AO --help)",
       "Bash(npx:*)",
       "Bash(fuser:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(./pocketbase migrate)",
+      "Bash(./pocketbase.exe migrate)",
+      "Bash(./pocketbase.exe migrate:*)",
+      "Bash(./pocketbase.exe version)",
+      "Bash(./pocketbase.exe --version)",
+      "mcp__browser-tools__browser_navigate",
+      "mcp__browser-tools__browser_install",
+      "mcp__puppeteer__puppeteer_navigate"
     ],
     "deny": []
   }

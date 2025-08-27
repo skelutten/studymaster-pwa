@@ -89,6 +89,32 @@ export interface PocketBaseCollections {
     created: string
     updated: string
   }
+
+  media_files: {
+    id: string
+    filename: string
+    original_filename: string
+    original_size: number
+    optimized_size?: number
+    mime_type: string
+    status: 'pending' | 'optimizing' | 'ready' | 'failed'
+    media_file: string
+    processing_started_at?: string
+    processing_completed_at?: string
+    original_url?: string
+    cdn_url?: string
+    thumbnail_url?: string
+    compression_ratio?: number
+    dimensions_json?: Record<string, unknown>
+    duration?: number
+    virus_scan_result?: 'clean' | 'infected' | 'pending'
+    content_validated: boolean
+    security_warnings_json?: Record<string, unknown>
+    anki_model_id?: string
+    card_id?: string
+    created: string
+    updated: string
+  }
 }
 
 interface UserPreferences {
@@ -104,7 +130,8 @@ interface UserPreferences {
 export const collections = {
   users: () => pb.collection('users'),
   decks: () => pb.collection('decks'),
-  cards: () => pb.collection('cards')
+  cards: () => pb.collection('cards'),
+  media_files: () => pb.collection('media_files')
 }
 
 // Export PocketBase client as default

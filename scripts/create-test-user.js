@@ -7,8 +7,8 @@ async function createTestUser() {
   const userData = {
     username: "gurka",
     email: "gurka@studymaster.app", 
-    password: "gurka123",
-    passwordConfirm: "gurka123",
+    password: "gurka",
+    passwordConfirm: "gurka",
     level: 5,
     total_xp: 2500,
     coins: 150,
@@ -44,7 +44,7 @@ async function createTestUser() {
       console.log("✅ Test user created successfully\!");
       console.log("   Username: gurka");
       console.log("   Email: gurka@studymaster.app");
-      console.log("   Password: gurka123");
+      console.log("   Password: gurka");
       console.log("   User ID:", data.id);
       return true;
     } else {
@@ -70,7 +70,7 @@ async function testAuthentication() {
       },
       body: JSON.stringify({
         identity: "gurka",
-        password: "gurka123"
+        password: "gurka"
       })
     });
     
@@ -106,7 +106,7 @@ async function main() {
   
   if (userCreated && authWorked) {
     console.log("\n🎉 PocketBase setup is working\!");
-    console.log("   Try logging in with gurka/gurka123 in your React app");
+    console.log("   Try logging in with gurka/gurka in your React app");
   } else {
     console.log("\n⚠️  Manual setup may be needed through admin interface");
   }
