@@ -35,10 +35,10 @@ describe('debugLogger', () => {
     })
 
     it('should log info with correct level', () => {
-      debugLogger.info('[SUPABASE]', 'Info message', 'info data')
+      debugLogger.info('[POCKETBASE]', 'Info message', 'info data')
       
       expect(mockConsole.info).toHaveBeenCalledWith(
-        expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z \[SUPABASE\] Info message/),
+        expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z \[POCKETBASE\] Info message/),
         'info data'
       )
     })
@@ -85,7 +85,7 @@ describe('debugLogger', () => {
     })
 
     it('should add separators for START actions', () => {
-      debugLogger.log('[SUPABASE]', 'START authentication', {})
+      debugLogger.log('[POCKETBASE]', 'START authentication', {})
       
       expect(mockConsole.log).toHaveBeenCalledWith('\n' + '='.repeat(80))
     })
@@ -127,7 +127,7 @@ describe('debugLogger', () => {
       })
       
       expect(() => {
-        debugLogger.group('[SUPABASE]', 'Error Group', errorFn)
+        debugLogger.group('[POCKETBASE]', 'Error Group', errorFn)
       }).toThrow('Test error')
       
       // Should still call groupEnd even if function throws
@@ -162,7 +162,7 @@ describe('debugLogger', () => {
 
     it('should log URL information with URL object', () => {
       const testUrl = new URL('https://example.com/path?param=value#section')
-      debugLogger.logUrl('[SUPABASE]', 'URL object test', testUrl)
+      debugLogger.logUrl('[POCKETBASE]', 'URL object test', testUrl)
       
       expect(mockConsole.group).toHaveBeenCalled()
       expect(mockConsole.log).toHaveBeenCalledWith('Full URL:', testUrl.href)
@@ -216,7 +216,7 @@ describe('debugLogger', () => {
         refresh_token: undefined
       }
       
-      debugLogger.logTokens('[SUPABASE]', 'Null tokens', tokens)
+      debugLogger.logTokens('[POCKETBASE]', 'Null tokens', tokens)
       
       expect(mockConsole.log).toHaveBeenCalledWith('access_token:', 'null')
       expect(mockConsole.log).toHaveBeenCalledWith('refresh_token:', 'null')
@@ -266,10 +266,10 @@ describe('debugLogger', () => {
         data: null
       }
       
-      debugLogger.logApiResponse('[SUPABASE]', 'API Error', response)
+      debugLogger.logApiResponse('[POCKETBASE]', 'API Error', response)
       
       expect(mockConsole.group).toHaveBeenCalledWith(
-        expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z \[SUPABASE\] API Error - API Response/)
+        expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z \[POCKETBASE\] API Error - API Response/)
       )
       
       expect(mockConsole.error).toHaveBeenCalledWith('Error:', response.error)
@@ -308,7 +308,7 @@ describe('debugLogger', () => {
       const shortToken = 'abc'
       const tokens = { access_token: shortToken }
       
-      debugLogger.logTokens('[SUPABASE]', 'Short token', tokens)
+      debugLogger.logTokens('[POCKETBASE]', 'Short token', tokens)
       
       expect(mockConsole.log).toHaveBeenCalledWith('access_token:', 'abc...abc')
     })

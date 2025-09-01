@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { debugLogger } from '../utils/debugLogger';
 import { useAuthStore } from '../stores/authStore';
+import { pb } from '../lib/pocketbase';
 
 function DebugLogTestPage() {
   const navigate = useNavigate();
@@ -65,9 +66,9 @@ function DebugLogTestPage() {
         <pre style={{ background: '#f0f0f0', padding: '1rem', borderRadius: '4px' }}>
           {JSON.stringify({
             isAuthenticated,
-            hasSession: !!session,
-            userId: session?.user?.id,
-            userEmail: session?.user?.email
+            hasSession: pb.authStore.isValid,
+            userId: pb.authStore.record?.id,
+            userEmail: pb.authStore.record?.email
           }, null, 2)}
         </pre>
       </div>
@@ -76,7 +77,7 @@ function DebugLogTestPage() {
         <h3>Instructions to test password reset flow:</h3>
         <ol>
           <li>Open browser console (F12)</li>
-          <li>Look for logs with prefixes: [RESET_PASSWORD], [AUTH_STORE], [SUPABASE]</li>
+          <li>Look for logs with prefixes: [RESET_PASSWORD], [AUTH_STORE], [POCKETBASE]</li>
           <li>Navigate to the actual reset password page with a valid token</li>
           <li>Observe the detailed logging output</li>
         </ol>
