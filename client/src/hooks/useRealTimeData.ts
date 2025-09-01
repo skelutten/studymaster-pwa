@@ -114,52 +114,86 @@ export const useRealTimeData = (options: UseRealTimeDataOptions = {}) => {
     let refreshTimer: NodeJS.Timeout | null = null
     const unsubscribeFunctions: (() => void)[] = []
     let stopRealTimeUpdates: (() => void) | null = null
+    let isCleanedUp = false
 
-    if (enableSubscriptions) {
-      // Set up real-time subscriptions
-      const unsubscribeGlobal = realTimeDataService.subscribe('globalStats', (data: GlobalLearningStats) => {
-        setState(prev => ({ ...prev, globalStats: data, lastUpdated: new Date() }))
-      })
+    // Cleanup function to prevent memory leaks
+    const cleanup = () => {
+      if (isCleanedUp) return
+      isCleanedUp = true
 
-      const unsubscribeTrends = realTimeDataService.subscribe('educationalTrends', (data: EducationalTrends) => {
-        setState(prev => ({ ...prev, educationalTrends: data, lastUpdated: new Date() }))
-      })
-
-      const unsubscribeLive = realTimeDataService.subscribe('liveMetrics', (data: LiveUserMetrics) => {
-        setState(prev => ({ ...prev, liveMetrics: data, lastUpdated: new Date() }))
-      })
-
-      const unsubscribeMarket = realTimeDataService.subscribe('marketInsights', (data: MarketInsights) => {
-        setState(prev => ({ ...prev, marketInsights: data, lastUpdated: new Date() }))
-      })
-
-      unsubscribeFunctions.push(unsubscribeGlobal, unsubscribeTrends, unsubscribeLive, unsubscribeMarket)
-
-      // Start real-time updates service with reference counting
-      stopRealTimeUpdates = realTimeDataService.startRealTimeUpdates()
-    }
-
-    if (autoRefresh) {
-      // Set up auto-refresh timer
-      refreshTimer = setInterval(() => {
-        loadData()
-      }, refreshInterval)
-    }
-
-    return () => {
       // Cleanup subscriptions
-      unsubscribeFunctions.forEach(unsubscribe => unsubscribe())
+      unsubscribeFunctions.forEach(unsubscribe => {
+        try {
+          unsubscribe()
+        } catch (error) {
+          console.warn('Error during subscription cleanup:', error)
+        }
+      })
+      unsubscribeFunctions.length = 0
       
       // Stop real-time updates (reference counting will handle when to actually stop)
       if (stopRealTimeUpdates) {
-        stopRealTimeUpdates()
+        try {
+          stopRealTimeUpdates()
+        } catch (error) {
+          console.warn('Error stopping real-time updates:', error)
+        }
+        stopRealTimeUpdates = null
       }
       
       // Clear refresh timer
       if (refreshTimer) {
         clearInterval(refreshTimer)
+        refreshTimer = null
       }
     }
+
+    if (enableSubscriptions) {
+      try {
+        // Set up real-time subscriptions
+        const unsubscribeGlobal = realTimeDataService.subscribe('globalStats', (data: GlobalLearningStats) => {
+          if (!isCleanedUp) {
+            setState(prev => ({ ...prev, globalStats: data, lastUpdated: new Date() }))
+          }
+        })
+
+        const unsubscribeTrends = realTimeDataService.subscribe('educationalTrends', (data: EducationalTrends) => {
+          if (!isCleanedUp) {
+            setState(prev => ({ ...prev, educationalTrends: data, lastUpdated: new Date() }))
+          }
+        })
+
+        const unsubscribeLive = realTimeDataService.subscribe('liveMetrics', (data: LiveUserMetrics) => {
+          if (!isCleanedUp) {
+            setState(prev => ({ ...prev, liveMetrics: data, lastUpdated: new Date() }))
+          }
+        })
+
+        const unsubscribeMarket = realTimeDataService.subscribe('marketInsights', (data: MarketInsights) => {
+          if (!isCleanedUp) {
+            setState(prev => ({ ...prev, marketInsights: data, lastUpdated: new Date() }))
+          }
+        })
+
+        unsubscribeFunctions.push(unsubscribeGlobal, unsubscribeTrends, unsubscribeLive, unsubscribeMarket)
+
+        // Start real-time updates service with reference counting
+        stopRealTimeUpdates = realTimeDataService.startRealTimeUpdates()
+      } catch (error) {
+        console.error('Error setting up real-time subscriptions:', error)
+      }
+    }
+
+    if (autoRefresh && refreshInterval > 0) {
+      // Set up auto-refresh timer with safe interval
+      refreshTimer = setInterval(() => {
+        if (!isCleanedUp) {
+          loadData()
+        }
+      }, refreshInterval)
+    }
+
+    return cleanup
   }, [loadData, autoRefresh, refreshInterval, enableSubscriptions])
 
   return {

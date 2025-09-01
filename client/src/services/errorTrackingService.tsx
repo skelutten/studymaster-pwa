@@ -36,7 +36,7 @@ class ErrorTrackingService {
       maxStoredErrors: 100,
       enableConsoleLogging: true,
       enableLocalStorage: true,
-      environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+      environment: import.meta.env.MODE === 'production' ? 'production' : 'development',
       ...config
     }
     
@@ -269,9 +269,9 @@ class ErrorTrackingService {
 
 // Singleton instance
 export const errorTracker = new ErrorTrackingService({
-  environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+  environment: import.meta.env.MODE === 'production' ? 'production' : 'development',
   maxStoredErrors: 100,
-  enableConsoleLogging: process.env.NODE_ENV !== 'production',
+  enableConsoleLogging: import.meta.env.DEV,
   enableLocalStorage: true
 })
 

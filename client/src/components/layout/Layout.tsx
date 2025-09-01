@@ -1,33 +1,52 @@
 import { Outlet } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useCallback, memo } from 'react'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
 import { useAuthStore } from '../../stores/authStore'
 import AuthModal from './AuthModal'
 
-const Layout = () => {
+const Layout = memo(() => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot-password'>('login')
   const { isAuthenticated, user } = useAuthStore()
   
-  // Debug authentication state
-  console.log('[LAYOUT]', 'Layout render - Auth state:', {
-    isAuthenticated,
-    hasUser: !!user,
-    userId: user?.id,
-    timestamp: new Date().toISOString()
-  })
+  // Debug authentication state - only in development
+  if (import.meta.env.DEV) {
+    console.log('[LAYOUT]', 'Layout render - Auth state:', {
+      isAuthenticated,
+      hasUser: !!user,
+      userId: user?.id,
+      timestamp: new Date().toISOString()
+    })
+  }
 
-  const handleSignIn = () => {
+  // Memoize handlers to prevent child re-renders
+  const handleMenuClick = useCallback(() => {
+    setSidebarOpen(true)
+  }, [])
+
+  const handleSidebarClose = useCallback(() => {
+    setSidebarOpen(false)
+  }, [])
+
+  const handleSignIn = useCallback(() => {
     setAuthMode('login')
     setAuthModalOpen(true)
-  }
+  }, [])
 
-  const handleCreateAccount = () => {
+  const handleCreateAccount = useCallback(() => {
     setAuthMode('register')
     setAuthModalOpen(true)
-  }
+  }, [])
+
+  const handleAuthModalClose = useCallback(() => {
+    setAuthModalOpen(false)
+  }, [])
+
+  const handleAuthModeChange = useCallback((mode: 'login' | 'register' | 'forgot-password') => {
+    setAuthMode(mode)
+  }, [])
 
   if (!isAuthenticated) {
     return (
@@ -59,9 +78,9 @@ const Layout = () => {
         
         <AuthModal
           isOpen={authModalOpen}
-          onClose={() => setAuthModalOpen(false)}
+          onClose={handleAuthModalClose}
           mode={authMode}
-          onModeChange={setAuthMode}
+          onModeChange={handleAuthModeChange}
         />
       </>
     )
@@ -73,20 +92,20 @@ const Layout = () => {
       {sidebarOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={handleSidebarClose}
         />
       )}
 
       {/* Sidebar */}
       <Sidebar 
         isOpen={sidebarOpen} 
-        onClose={() => setSidebarOpen(false)} 
+        onClose={handleSidebarClose} 
       />
 
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Top navbar */}
-        <Navbar onMenuClick={() => setSidebarOpen(true)} />
+        <Navbar onMenuClick={handleMenuClick} />
         
         {/* Page content */}
         <main className="py-6">
@@ -97,6 +116,8 @@ const Layout = () => {
       </div>
     </div>
   )
-}
+})
+
+Layout.displayName = 'Layout'
 
 export default Layout
