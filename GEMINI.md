@@ -42,12 +42,12 @@ cd client && npm run build
 cd server && npm run build
 ```
 
-Supabase (local optional)
+PocketBase (local development)
 ```bash
-npx supabase start
-npx supabase db reset
-# If types are generated for client
-npx supabase gen types typescript --local > client/src/types/supabase.ts
+cd pocketbase
+./pocketbase.exe serve --http 0.0.0.0:8090
+# PocketBase admin UI available at http://localhost:8090/_/
+# Database and auth handled automatically
 ```
 
 Environment configuration
@@ -69,7 +69,7 @@ cd ../server && vercel --prod
 - See [docs/deployment/README.md](docs/deployment/README.md:1) for details and env management.
 
 Project conventions (delta from global)
-- Tech stack: React + TypeScript + Vite on the client; Node/TypeScript on the server; Supabase for data
+- Tech stack: React + TypeScript + Vite on the client; Node/TypeScript on the server; PocketBase for data
 - Keep feature logic small and typed; colocate UI with component state; extract reusable utilities to [client/src/utils/](client/src/utils/debugLogger.ts:1)
 - Update documentation when adding features: [README.md](README.md:1) and relevant docs under [docs/](docs/features/README.md:1)
 - Avoid oversized files; refactor long modules into smaller units

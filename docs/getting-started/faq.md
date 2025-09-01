@@ -49,7 +49,7 @@ Common questions and answers about StudyMaster PWA.
 **A:** We recommend Vercel for both client and server deployment. See our [Deployment Guide](../deployment/README.md) for step-by-step instructions.
 
 ### Q: What environment variables do I need?
-**A:** You'll need Supabase credentials, database connection strings, and JWT secrets. Check the [Security Guide](../security/README.md) for the complete list.
+**A:** You'll need PocketBase server URL and admin credentials. Check the [Security Guide](../security/README.md) for the complete list.
 
 ## 🐛 Troubleshooting
 
@@ -57,7 +57,7 @@ Common questions and answers about StudyMaster PWA.
 **A:** Check that ports 3000 and 3001 are available, ensure all dependencies are installed with `npm install`, and see our [Troubleshooting Guide](../development/troubleshooting.md).
 
 ### Q: I'm getting database connection errors. How do I fix this?
-**A:** Verify your Supabase credentials in the `.env` file, check your internet connection, and ensure your Supabase project is active.
+**A:** Verify your PocketBase URL in the `.env` file, check your internet connection, and ensure your PocketBase server is running.
 
 ### Q: Hot reload isn't working. What's wrong?
 **A:** Make sure you're editing files in the `src/` directories, check for TypeScript errors in the terminal, and try clearing your browser cache.

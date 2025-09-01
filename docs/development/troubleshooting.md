@@ -55,12 +55,12 @@ npm install
 
 ### Database Connection Issues
 
-**Problem**: Cannot connect to Supabase or database errors
+**Problem**: Cannot connect to PocketBase or database errors
 
 **Solutions**:
-- Verify environment variables in `server/.env`
-- Check Supabase project status and credentials
-- Ensure database schema is up to date
+- Verify PocketBase server is running on port 8090
+- Check environment variables in `client/.env`
+- Ensure PocketBase collections are properly configured
 - Check network connectivity and firewall settings
 
 ### Build Errors

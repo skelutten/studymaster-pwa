@@ -44,16 +44,10 @@ A modern Progressive Web App that combines the best features of Anki, AnkiDroid,
 
 ### Backend & Database
 - **Node.js** with Express.js and TypeScript
-- **Supabase** (PostgreSQL with real-time features)
-- **Supabase Auth** for authentication
-- **Supabase Storage** for file management
-- **Supabase Edge Functions** for server-side logic
 
 ### Infrastructure & Deployment
 - **Vercel** for frontend and backend deployment
-- **Supabase** for database, auth, real-time, and storage
 - **Push API** for notifications
-- **JWT** tokens via Supabase Auth
 
 ## 📋 Prerequisites
 
@@ -89,9 +83,9 @@ npm run dev
 
 ### 🏗️ Architecture
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
-- **Backend**: Node.js + Express + TypeScript + Supabase
-- **Database**: Supabase (PostgreSQL with real-time subscriptions)
-- **Authentication**: Supabase Auth with JWT tokens
+- **Backend**: Node.js + Express + TypeScript + PocketBase
+- **Database**: PocketBase (SQLite with real-time subscriptions)
+- **Authentication**: PocketBase Auth with JWT tokens
 - **PWA**: Workbox + Service Workers + Offline Support
 - **Deployment**: Vercel (client + server)
 
