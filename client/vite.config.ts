@@ -177,6 +177,10 @@ export default defineConfig({
     target: 'esnext',
     sourcemap: true,
     rollupOptions: {
+      external: (id) => {
+        // Don't externalize these, but mark them for special handling
+        return false;
+      },
       output: {
         // Optimized chunk splitting for smaller initial bundle
         manualChunks: (id) => {
@@ -224,21 +228,23 @@ export default defineConfig({
     },
     // Reduce chunk size warning limit to catch large bundles  
     chunkSizeWarningLimit: 400,
-    // Enable aggressive tree shaking and minification
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.warn', 'console.info'],
-        dead_code: true,
-        reduce_vars: true,
-        toplevel: true
-      },
-      mangle: {
-        toplevel: true
-      }
-    }
+    // Use safer minification to avoid React production issues
+    minify: 'esbuild',
+    // Keep console logs for debugging in production
+    // terserOptions: {
+    //   compress: {
+    //     drop_console: false,
+    //     drop_debugger: true,
+    //     pure_funcs: [],
+    //     dead_code: true,
+    //     reduce_vars: false,
+    //     toplevel: false
+    //   },
+    //   mangle: {
+    //     toplevel: false
+    //   }
+    // }
+    
   },
   // Add preview configuration for SPA fallback
   preview: {
