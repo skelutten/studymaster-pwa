@@ -151,7 +151,9 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@shared': path.resolve(__dirname, '../shared')
-    }
+    },
+    // Ensure single instance of React dependencies to prevent runtime errors
+    dedupe: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query']
   },
   server: {
     port: 3000,
@@ -188,10 +190,12 @@ export default defineConfig({
           if (id.includes('sql.js')) return 'sql-vendor'
           if (id.includes('jszip')) return 'zip-vendor'
           if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'chart-vendor'
-          if (id.includes('framer-motion')) return 'animation-vendor'
           
-          // Core React dependencies
-          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+          // Core React ecosystem - keep ALL React-related together to prevent conflicts
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') ||
+              id.includes('@tanstack/react-query') || id.includes('use-sync-external-store') ||
+              id.includes('scheduler') || id.includes('react-hook-form') ||
+              id.includes('react-chartjs-2') || id.includes('framer-motion')) {
             return 'react-vendor'
           }
           
@@ -200,8 +204,8 @@ export default defineConfig({
             return 'ui-vendor'
           }
           
-          // Data management
-          if (id.includes('zustand') || id.includes('@tanstack/react-query') || id.includes('pocketbase')) {
+          // Data management (non-React dependencies)
+          if (id.includes('zustand') || id.includes('pocketbase')) {
             return 'data-vendor'
           }
           
@@ -229,7 +233,22 @@ export default defineConfig({
     // Reduce chunk size warning limit to catch large bundles  
     chunkSizeWarningLimit: 400,
     // Use safer minification to avoid React production issues
-    minify: 'esbuild',
+    minify: 'terser',
+    // Safer terser options to prevent React issues
+    terserOptions: {
+      compress: {
+        drop_console: false,
+        drop_debugger: true,
+        pure_funcs: ['console.debug'],
+        reduce_vars: false, // Safer for React
+        toplevel: false,    // Safer for React
+        keep_fnames: true   // Keep function names for React
+      },
+      mangle: {
+        keep_fnames: true,  // Keep function names for React
+        toplevel: false     // Safer for React
+      }
+    },
     // Keep console logs for debugging in production
     // terserOptions: {
     //   compress: {
