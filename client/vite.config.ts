@@ -189,13 +189,15 @@ export default defineConfig({
           // Heavy dependencies that should be separate chunks
           if (id.includes('sql.js')) return 'sql-vendor'
           if (id.includes('jszip')) return 'zip-vendor'
-          if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'chart-vendor'
+          // Only chart.js itself, not react-chartjs-2 (which needs to be with React)
+          if (id.includes('chart.js') && !id.includes('react-chartjs-2')) return 'chart-vendor'
           
           // Core React ecosystem - keep ALL React-related together to prevent conflicts
           if (id.includes('react') || id.includes('react-dom') || id.includes('react-router') ||
               id.includes('@tanstack/react-query') || id.includes('use-sync-external-store') ||
               id.includes('scheduler') || id.includes('react-hook-form') ||
-              id.includes('react-chartjs-2') || id.includes('framer-motion')) {
+              id.includes('react-chartjs-2') || id.includes('framer-motion') ||
+              id.includes('recharts')) {
             return 'react-vendor'
           }
           
