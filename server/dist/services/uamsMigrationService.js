@@ -22,6 +22,8 @@ class UAMSMigrationService {
             difficulty,
             stability,
             retrievability,
+            confidence: 0.5,
+            explanation: "Migrated from UAMS system with calculated DSR values"
         };
     }
 }
