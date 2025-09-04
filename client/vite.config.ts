@@ -2,6 +2,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { visualizer } from 'rollup-plugin-visualizer'
 import path from 'path'
 
 // Security headers plugin for production
@@ -25,6 +26,16 @@ export default defineConfig({
   plugins: [
     react(),
     securityHeadersPlugin(),
+    // Bundle analyzer - enable with ANALYZE=true npm run build
+    ...(process.env.ANALYZE === 'true' ? [
+      visualizer({
+        filename: 'dist/bundle-analysis.html',
+        open: true,
+        template: 'treemap',
+        gzipSize: true,
+        brotliSize: true
+      })
+    ] : []),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
@@ -189,6 +200,7 @@ export default defineConfig({
           // Heavy dependencies that should be separate chunks
           if (id.includes('sql.js')) return 'sql-vendor'
           if (id.includes('jszip')) return 'zip-vendor'
+          if (id.includes('web-vitals')) return 'analytics-vendor'
           // Only chart.js itself, not react-chartjs-2 (which needs to be with React)
           if (id.includes('chart.js') && !id.includes('react-chartjs-2')) return 'chart-vendor'
           
@@ -216,14 +228,16 @@ export default defineConfig({
             return 'vendor'
           }
           
-          // App-specific chunks - only include if part of large components
+          // App-specific chunks - split heavy components
+          if (id.includes('src/services/anki/')) return 'anki-services'
           if (id.includes('src/services/')) return 'services'
           if (id.includes('src/stores/')) return 'stores'
           
-          // Keep components in main bundle unless they're heavy
+          // Split heavy components for better loading
           if (id.includes('src/components/dashboard/') || 
-              id.includes('src/components/gamification/')) {
-            return 'components'
+              id.includes('src/components/gamification/') ||
+              id.includes('src/components/study/SecureCardRenderer')) {
+            return 'heavy-components'
           }
         },
         // Use content-based hashing for better caching

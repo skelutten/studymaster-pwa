@@ -5,6 +5,15 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
 
+// Initialize performance monitoring if enabled
+if (import.meta.env.VITE_WEB_VITALS_ENABLED === 'true') {
+  import('./utils/performanceMonitoring').then(({ default: PerformanceMonitor }) => {
+    PerformanceMonitor.initializeCoreWebVitals()
+  }).catch(error => {
+    console.warn('Failed to initialize performance monitoring:', error)
+  })
+}
+
 // PWA functionality is handled by Vite PWA plugin
 
 // Create a client for React Query
