@@ -1,12 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { AnkiModel, AnkiTemplate, RenderingContext, SanitizationResult } from '../../../../shared/types/anki'
 import { SecureRenderer } from '../../services/anki/SecureRenderer'
+import { MediaContextService } from '../../services/anki/MediaContextService'
+import { useAuth } from '../../hooks/useAuth'
 
 interface SecureCardRendererProps {
   model: AnkiModel
   template: AnkiTemplate
   fieldData: Record<string, string>
   renderMode: 'question' | 'answer'
+  deckId: string
   mediaMap?: Record<string, string>
   onRenderComplete?: (result: SanitizationResult) => void
   onRenderError?: (error: string) => void
@@ -34,6 +37,7 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
   template,
   fieldData,
   renderMode,
+  deckId,
   mediaMap = {},
   onRenderComplete,
   onRenderError,
@@ -44,14 +48,18 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const rendererRef = useRef<SecureRenderer>(new SecureRenderer())
+  const mediaContextRef = useRef<MediaContextService>(new MediaContextService())
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const messageIdRef = useRef<number>(0)
   const pendingRequestsRef = useRef<Map<string, { resolve: Function; reject: Function }>>(new Map())
+  const { user } = useAuth()
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dimensions, setDimensions] = useState<IframeDimensions>({ width: 0, height: 0 })
   const [renderResult, setRenderResult] = useState<SanitizationResult | null>(null)
+  const [mediaResolved, setMediaResolved] = useState(false)
+  const [mediaInitialized, setMediaInitialized] = useState(false)
 
   // Generate unique message ID
   const generateMessageId = useCallback((): string => {
@@ -110,6 +118,32 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
       }
     })
   }, [timeout, generateMessageId])
+
+  // Initialize media mappings for the deck
+  const initializeMediaMappings = useCallback(async () => {
+    if (!user?.id || !deckId || mediaInitialized) return
+
+    try {
+      // Fetch deck media files from database
+      const response = await fetch(`/api/decks/${deckId}/media`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const mediaFiles = await response.json()
+        await mediaContextRef.current.buildMappingsFromImport(deckId, mediaFiles, user.id)
+        setMediaInitialized(true)
+        console.log('SecureCardRenderer: Media mappings initialized', { deckId, mediaCount: mediaFiles.length })
+      }
+    } catch (error) {
+      console.warn('SecureCardRenderer: Failed to initialize media mappings:', error)
+      // Continue without media mappings - cards will show missing media placeholders
+      setMediaInitialized(true)
+    }
+  }, [deckId, user?.id, user?.token, mediaInitialized])
 
   // Handle messages from iframe
   const handleIframeMessage = useCallback((event: MessageEvent) => {
@@ -176,7 +210,12 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
   const renderCard = useCallback(async () => {
     try {
       setError(null)
+      setMediaResolved(false)
       
+      if (!user?.id) {
+        throw new Error('User not authenticated')
+      }
+
       // Sanitize content using SecureRenderer
       const result = await rendererRef.current.renderAnkiCard(
         model,
@@ -189,6 +228,21 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
 
       if (!result.isSecure) {
         console.warn('SecureCardRenderer: Security warnings detected:', result.securityWarnings)
+      }
+
+      // Resolve media references using MediaContextService
+      let processedHtml = result.sanitizedHtml
+      try {
+        processedHtml = await mediaContextRef.current.resolveMediaReferences(
+          result.sanitizedHtml,
+          deckId,
+          user.id
+        )
+        setMediaResolved(true)
+        console.log('SecureCardRenderer: Media references resolved successfully')
+      } catch (mediaError) {
+        console.warn('SecureCardRenderer: Media resolution failed:', mediaError)
+        // Continue with original HTML if media resolution fails
       }
 
       // Create rendering context
@@ -204,13 +258,14 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
         sanitizationLevel: 'strict'
       }
 
-      // Send render request to iframe
+      // Send render request to iframe with resolved media
       await sendMessageToIframe('render_card', {
-        html: result.sanitizedHtml,
+        html: processedHtml,
         css: model.css,
         nonce: context.cspNonce,
         fieldData: context.fieldData,
-        mediaMap: context.mediaMap
+        mediaMap: context.mediaMap,
+        mediaResolved
       })
 
       onRenderComplete?.(result)
@@ -221,7 +276,7 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
       setError(errorMsg)
       onRenderError?.(errorMsg)
     }
-  }, [model, template, fieldData, renderMode, mediaMap, onRenderComplete, onRenderError, sendMessageToIframe])
+  }, [model, template, fieldData, renderMode, deckId, user?.id, mediaMap, onRenderComplete, onRenderError, sendMessageToIframe])
 
   // Generate CSP nonce
   const generateCSPNonce = useCallback((): string => {
@@ -296,11 +351,26 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
               height: auto;
               display: block;
               margin: 10px auto;
+              border-radius: 4px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
             audio, video {
               max-width: 100%;
               display: block;
               margin: 10px auto;
+              border-radius: 4px;
+            }
+            .missing-media {
+              margin: 8px 0;
+              font-size: 14px;
+              border-radius: 4px;
+            }
+            .anki-audio-container {
+              text-align: center;
+            }
+            .audio-filename {
+              margin-top: 4px;
+              opacity: 0.8;
             }
           </style>
         </head>
@@ -358,9 +428,17 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
                   height: Math.max(document.body.scrollHeight, document.body.offsetHeight)
                 };
                 
+                const mediaElements = document.querySelectorAll('img, audio, video')
+                const missingMediaElements = document.querySelectorAll('.missing-media')
+                
                 sendMessage('card_ready', { 
                   dimensions: dimensions,
-                  mediaCount: { total: document.querySelectorAll('img, audio, video').length }
+                  mediaCount: { 
+                    total: mediaElements.length,
+                    resolved: mediaElements.length - missingMediaElements.length,
+                    missing: missingMediaElements.length
+                  },
+                  mediaResolved: data.mediaResolved || false
                 });
               } catch (error) {
                 sendMessage('error', { message: error.message });
@@ -412,10 +490,17 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
 
   // Re-render when props change
   useEffect(() => {
-    if (!isLoading && iframeRef.current) {
+    if (!isLoading && iframeRef.current && user?.id && mediaInitialized) {
       renderCard()
     }
-  }, [model.id, template.id, renderMode, fieldData, renderCard, isLoading])
+  }, [model.id, template.id, renderMode, fieldData, deckId, renderCard, isLoading, user?.id, mediaInitialized])
+
+  // Initialize media mappings when component mounts or deckId changes
+  useEffect(() => {
+    if (user?.id && deckId) {
+      initializeMediaMappings()
+    }
+  }, [deckId, user?.id, initializeMediaMappings])
 
   // Calculate iframe height
   const iframeHeight = Math.min(dimensions.height || 200, maxHeight)
@@ -464,6 +549,25 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
         />
       </div>
 
+      {/* Media loading status */}
+      {!mediaInitialized && (
+        <div className="mb-2 text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded">
+          <span className="inline-flex items-center">
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading media resources...
+          </span>
+        </div>
+      )}
+
+      {mediaInitialized && !mediaResolved && (
+        <div className="mb-2 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded">
+          ⚠️ Media references not resolved - media may not display correctly
+        </div>
+      )}
+
       {/* Debug info in development */}
       {process.env.NODE_ENV === 'development' && renderResult && (
         <details className="mt-4 text-sm text-gray-600">
@@ -477,6 +581,12 @@ export const SecureCardRenderer: React.FC<SecureCardRendererProps> = ({
             </div>
             <div>
               <strong>Media References:</strong> {renderResult.mediaReferences.length}
+            </div>
+            <div>
+              <strong>Media Initialized:</strong> {mediaInitialized ? '✅' : '⏳'}
+            </div>
+            <div>
+              <strong>Media Resolved:</strong> {mediaResolved ? '✅' : '❌'}
             </div>
             <div>
               <strong>Removed Elements:</strong> {renderResult.removedElements.join(', ') || 'None'}
