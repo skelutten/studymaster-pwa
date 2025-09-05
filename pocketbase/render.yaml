@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: studymaster-pocketbase
+    env: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    disk:
+      name: pocketbase-data
+      mountPath: /pb/pb_data
+      sizeGB: 1
