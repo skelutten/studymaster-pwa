@@ -12,6 +12,7 @@
  */
 
 import Dexie, { Table } from 'dexie';
+import { logError, logWarning, logInfo } from '../services/errorTrackingService';
 
 /* =========================
  * Row Types (initial schema)
@@ -197,24 +198,22 @@ export class StudyMasterDB extends Dexie {
           });
         }
       } catch (err) {
-        console.error('[DB] populate error:', err);
+        logError(err instanceof Error ? err : new Error(String(err)), { scope: 'db.populate' });
       }
     });
 
     this.on('ready', () => {
       // Database is ready for use
       // Avoid heavy work here; use repos/services for business logic
-      // console.debug('[DB] ready');
+      logInfo('DB ready', { scope: 'db.ready' });
     });
 
     this.on('blocked', (e) => {
-      console.warn('[DB] blocked - close other tabs or reload to proceed', e);
+      logWarning('DB blocked - close other tabs or reload to proceed', { event: e, scope: 'db.blocked' });
     });
 
     this.on('versionchange', () => {
-      // If a newer tab/version tries to upgrade, we can close gracefully
-      // to unblock the upgrader (optional).
-      // console.info('[DB] versionchange - closing to allow upgrade');
+      logInfo('DB versionchange - closing to allow upgrade', { scope: 'db.versionchange' });
       this.close();
     });
   }
