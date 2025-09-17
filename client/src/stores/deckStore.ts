@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { Deck, Card, DeckSettings } from '../../../shared/types'
+import type { Deck, Card, DeckSettings } from '../../../shared/types'
 import { createNewCard } from '../utils/cardDefaults'
 
+import { repos } from '../data'
+import { buildNewDeckFromDomain, buildNewCardFromDomain, mapDeckUpdatesToRepo } from '../data/mappers/domainMappers'
 interface StudySession {
   deckId: string
   currentCardIndex: number
@@ -69,6 +71,34 @@ const defaultDeckSettings: DeckSettings = {
   intervalModifier: 1.0,
   maximumInterval: 36500, // 100 years
   minimumInterval: 1
+};
+
+// Offline-first persistence helpers (IndexedDB via repositories)
+async function persistCreateDeck(deckData: Omit<Deck, 'id' | 'createdAt' | 'updatedAt'>) {
+  try {
+    await repos.decks.create(buildNewDeckFromDomain(deckData));
+  } catch (err) {
+    // Non-blocking persistence; UI state remains responsive
+    console.warn('[deckStore] repo createDeck failed', err);
+  }
+}
+
+async function persistAddCard(deckId: string, card: Card) {
+  try {
+    await repos.cards.create(
+      buildNewCardFromDomain({
+        deckId,
+        frontContent: card.frontContent,
+        backContent: card.backContent,
+        mediaRefs: card.mediaRefs,
+        state: card.state,
+        easeFactor: card.easeFactor,
+        intervalDays: card.intervalDays,
+      })
+    );
+  } catch (err) {
+    console.warn('[deckStore] repo addCard failed', err);
+  }
 }
 
 // Helper function to clean field content
@@ -282,6 +312,9 @@ export const useDeckStore = create<DeckStore>()(
             cards: { ...state.cards, [deck.id]: [] },
             isLoading: false
           }))
+
+          // Persist to IndexedDB (non-blocking)
+          void persistCreateDeck(deckData);
           
           return deck
         } catch (error) {
@@ -294,13 +327,20 @@ export const useDeckStore = create<DeckStore>()(
         set({ isLoading: true, error: null })
         try {
           set(state => ({
-            decks: state.decks.map(deck => 
-              deck.id === id 
+            decks: state.decks.map(deck =>
+              deck.id === id
                 ? { ...deck, ...updates, updatedAt: new Date().toISOString() }
                 : deck
             ),
             isLoading: false
           }))
+
+          // Persist deck updates (non-blocking)
+          try {
+            void repos.decks.update(id, mapDeckUpdatesToRepo(updates));
+          } catch (e) {
+            console.warn('[deckStore] repo updateDeck failed', e);
+          }
         } catch (error) {
           set({ error: 'Failed to update deck', isLoading: false })
           throw error
@@ -350,14 +390,17 @@ export const useDeckStore = create<DeckStore>()(
             
             return {
               cards: { ...state.cards, [deckId]: updatedCards },
-              decks: state.decks.map(deck => 
-                deck.id === deckId 
+              decks: state.decks.map(deck =>
+                deck.id === deckId
                   ? { ...deck, cardCount: updatedCards.length, updatedAt: new Date().toISOString() }
                   : deck
               ),
               isLoading: false
             }
           })
+
+          // Persist to IndexedDB (non-blocking)
+          void persistAddCard(deckId, card);
           
           return card
         } catch (error) {
@@ -418,6 +461,11 @@ export const useDeckStore = create<DeckStore>()(
               )
             }
           })
+
+          // Persist to IndexedDB (non-blocking) if not a skipped duplicate
+          if (card.id !== 'duplicate-skipped') {
+            void persistAddCard(deckId, card)
+          }
           
           return card
         } catch (error) {
@@ -440,6 +488,9 @@ export const useDeckStore = create<DeckStore>()(
             decks: [...state.decks, deck],
             cards: { ...state.cards, [deck.id]: [] }
           }))
+
+          // Persist to IndexedDB (non-blocking)
+          void persistCreateDeck(deckData);
           
           return deck
         } catch (error) {
@@ -497,6 +548,11 @@ export const useDeckStore = create<DeckStore>()(
             }
           })
           
+          // Persist each card (non-blocking)
+          for (const c of cards) {
+            void persistAddCard(deckId, c)
+          }
+
           return cards
         } catch (error) {
           console.error('Failed to add cards during batch import:', error)

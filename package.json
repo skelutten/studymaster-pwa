@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
+    "@rollup/rollup-win32-x64-msvc": "^4.50.2",
     "concurrently": "^8.2.2",
     "esbuild": "0.25.8",
     "eslint": "^8.57.1",
