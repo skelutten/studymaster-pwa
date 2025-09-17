@@ -164,26 +164,26 @@ Implementation notes (standards)
 Detailed TODO checklists
 
 Master checklist
-- [ ] Create client/src/data/ with db.ts and repositories.
-- [ ] Replace direct server calls in stores with repository calls.
-- [ ] Implement media blob storage with dedup and OPFS support.
+- [x] Create client/src/data/ with db.ts and repositories.
+- [-] Replace direct server calls in stores with repository calls.
+- [-] Implement media blob storage with dedup and OPFS support.
 - [ ] Enhance service worker and background sync queue.
 - [ ] Implement optional leaderboard provider and cache.
 - [ ] Add settings UI for online features and encryption.
-- [ ] Update tests to cover offline-first behavior.
-- [ ] Add structured logging and storage management UI.
+- [-] Update tests to cover offline-first behavior.
+- [-] Add structured logging and storage management UI.
 - [ ] Update documentation (README, docs/*).
 
 Phase 0: Foundation — TODO
-- [ ] Add Dexie and initialize DB (db.ts) with typed schema and version 1.
-- [ ] Implement repositories: deckRepo, cardRepo, reviewRepo, mediaRepo, gamificationRepo.
-- [ ] Add repository unit tests (CRUD, transactions, error cases).
-- [ ] Refactor deckStore.ts and study flows to use repositories.
-- [ ] Add logging for DB open/migration failures and transaction errors.
+- [x] Add Dexie and initialize DB (db.ts) with typed schema and version 1.
+- [x] Implement repositories: deckRepo, cardRepo, reviewRepo, mediaRepo, gamificationRepo.
+- [x] Add repository unit tests (CRUD, transactions, error cases).
+- [-] Refactor deckStore.ts and study flows to use repositories.
+- [-] Add logging for DB open/migration failures and transaction errors.
 
 Phase 1: Media storage + pipeline — TODO
-- [ ] Implement content-hash dedup (SHA-256) for media.
-- [ ] Store blobs in IndexedDB; use OPFS for large files; maintain pointers.
+- [-] Implement content-hash dedup (SHA-256) for media.
+- [-] Store blobs in IndexedDB; use OPFS for large files; maintain pointers.
 - [ ] Integrate workers with new storage (read/write paths).
 - [ ] Build storage management UI: usage meter, purge, re-derive.
 - [ ] Add tests: large deck import, render, quota/eviction paths.
