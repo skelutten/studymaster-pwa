@@ -27,8 +27,16 @@ export async function hashArrayBufferSHA256(buffer: ArrayBuffer): Promise<string
 
 /**
  * Compute SHA-256 hash of a Blob (e.g., media file) and return lowercase hex string.
+ * Uses blob.arrayBuffer() when available; falls back to Response for broader support (jsdom).
  */
 export async function hashBlobSHA256(blob: Blob): Promise<string> {
-  const buffer = await blob.arrayBuffer();
+  // Prefer native blob.arrayBuffer if available
+  const anyBlob = blob as any;
+  if (anyBlob && typeof anyBlob.arrayBuffer === 'function') {
+    const buffer = await anyBlob.arrayBuffer();
+    return hashArrayBufferSHA256(buffer);
+  }
+  // Fallback: use Response to read as ArrayBuffer (works in jsdom/node environments)
+  const buffer = await new Response(blob).arrayBuffer();
   return hashArrayBufferSHA256(buffer);
 }
