@@ -359,6 +359,12 @@ export const useDeckStore = create<DeckStore>()(
               isLoading: false
             }
           })
+          // Persist delete (non-blocking)
+          try {
+            void repos.decks.remove(id)
+          } catch (e) {
+            console.warn('[deckStore] repo deleteDeck failed', e)
+          }
         } catch (error) {
           set({ error: 'Failed to delete deck', isLoading: false })
           throw error
@@ -581,29 +587,34 @@ export const useDeckStore = create<DeckStore>()(
       deleteCard: async (cardId) => {
         set({ isLoading: true, error: null })
         try {
+          let affectedDeckId = ''
           set(state => {
             const newCards = { ...state.cards }
-            let targetDeckId = ''
-            
             for (const deckId in newCards) {
               const cardIndex = newCards[deckId].findIndex(card => card.id === cardId)
               if (cardIndex !== -1) {
                 newCards[deckId] = newCards[deckId].filter(card => card.id !== cardId)
-                targetDeckId = deckId
+                affectedDeckId = deckId
                 break
               }
             }
             
             return {
               cards: newCards,
-              decks: state.decks.map(deck => 
-                deck.id === targetDeckId 
-                  ? { ...deck, cardCount: newCards[targetDeckId].length, updatedAt: new Date().toISOString() }
+              decks: state.decks.map(deck =>
+                deck.id === affectedDeckId
+                  ? { ...deck, cardCount: newCards[affectedDeckId].length, updatedAt: new Date().toISOString() }
                   : deck
               ),
               isLoading: false
             }
           })
+          // Persist delete (non-blocking)
+          try {
+            void repos.cards.remove(cardId)
+          } catch (e) {
+            console.warn('[deckStore] repo deleteCard failed', e)
+          }
         } catch (error) {
           set({ error: 'Failed to delete card', isLoading: false })
           throw error
