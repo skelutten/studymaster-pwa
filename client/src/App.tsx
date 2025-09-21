@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/layout/Layout'
 import HomePage from './pages/HomePage'
@@ -14,9 +14,25 @@ import TestResetPage from './pages/TestResetPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import MapTestPage from './pages/MapTestPage'
 import DebugLogTestPage from './pages/DebugLogTestPage'
+import StoragePage from './pages/StoragePage'
 
 // Development/testing pages - can be removed in production
 const isDev = import.meta.env.DEV
+
+function EnhancedReviewRoute() {
+  const { deckId } = useParams();
+  const { user } = useAuthStore();
+  // Fallback user id for offline/local mode
+  const userId = user?.id ?? 'local-user';
+  return <EnhancedReviewPage deckId={deckId!} userId={userId} />;
+}
+
+function AnalyticsRoute() {
+  const { user } = useAuthStore();
+  const userId = user?.id ?? 'local-user';
+  // Provide a sensible default time range; component should handle this
+  return <AnalyticsDashboard userId={userId} timeRange={'last30Days' as any} />;
+}
 
 function App() {
   const { isAuthenticated } = useAuthStore()
@@ -29,9 +45,9 @@ function App() {
           path="/study/:deckId" 
           element={isAuthenticated ? <StudyPage /> : <Navigate to="/" replace />} 
         />
-        <Route 
-          path="/enhanced-review/:deckId" 
-          element={isAuthenticated ? <EnhancedReviewPage /> : <Navigate to="/" replace />} 
+        <Route
+          path="/enhanced-review/:deckId"
+          element={isAuthenticated ? <EnhancedReviewRoute /> : <Navigate to="/" replace />}
         />
         <Route 
           path="/decks" 
@@ -53,13 +69,17 @@ function App() {
           path="/stats" 
           element={<GlobalStatsPage />} 
         />
-        <Route 
-          path="/analytics" 
-          element={isAuthenticated ? <AnalyticsDashboard /> : <Navigate to="/" replace />} 
+        <Route
+          path="/analytics"
+          element={isAuthenticated ? <AnalyticsRoute /> : <Navigate to="/" replace />}
         />
-        <Route 
-          path="/reset-password" 
-          element={<ResetPasswordPage />} 
+        <Route
+          path="/reset-password"
+          element={<ResetPasswordPage />}
+        />
+        <Route
+          path="/storage"
+          element={<StoragePage />}
         />
         
         {/* Development/Testing Routes */}

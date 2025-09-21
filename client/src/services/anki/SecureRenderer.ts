@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify'
 import { JSDOM } from 'jsdom'
 import { SanitizationResult, RenderingContext, AnkiModel, AnkiTemplate, AnkiMediaFile } from '../../../../shared/types/anki'
-import { MediaService } from '../MediaService'
+import { mediaStorage } from '../mediaStorageService'
 
 // Helper function to escape regex special characters
 function escapeRegExp(string: string): string {
@@ -11,9 +11,8 @@ function escapeRegExp(string: string): string {
 // Security-focused Anki template renderer using DOMPurify
 // Provides defense-in-depth HTML sanitization with Anki-specific template processing
 export class SecureRenderer {
-  private purify: DOMPurify.DOMPurifyI
+  private purify: any
   private window: Window & typeof globalThis
-  private mediaService: MediaService
 
   constructor() {
     // CRITICAL: Configure for both browser and Node.js environments
@@ -28,7 +27,6 @@ export class SecureRenderer {
       this.purify = DOMPurify(this.window)
     }
 
-    this.mediaService = new MediaService()
     this.configurePurifyHooks()
   }
 
@@ -63,7 +61,7 @@ export class SecureRenderer {
       }
 
       // Track when an attribute is actually being removed (keepAttribute is false)
-      if (data.keepAttribute === false && data.attrName) {
+      if ((data as any).keepAttribute === false && data.attrName) {
         context.modifiedAttributes.push(`${data.attrName}="${data.attrValue || ''}"`)
         
         // Add security warnings for dangerous attributes
@@ -80,7 +78,7 @@ export class SecureRenderer {
       if (!context) return
 
       // Only track when an element is actually being removed (keepElement is false)
-      if (data.keepElement === false) {
+      if ((data as any).keepElement === false) {
         const tagName = data.tagName?.toLowerCase() || 'unknown'
         context.removedElements.push(tagName)
         
@@ -210,7 +208,12 @@ export class SecureRenderer {
       const sanitizedCss = this.sanitizeCss(css)
       
       // Sanitize HTML with Anki-aware configuration
-      const sanitizedHtml = this.purify.sanitize(htmlWithPlaceholders, config)
+      const sanitizedHtmlAny = this.purify.sanitize(htmlWithPlaceholders, config)
+      const sanitizedHtml = typeof sanitizedHtmlAny === 'string'
+        ? sanitizedHtmlAny
+        : (sanitizedHtmlAny && typeof (sanitizedHtmlAny as any).toString === 'function'
+            ? (sanitizedHtmlAny as any).toString()
+            : String(sanitizedHtmlAny))
       
       // CRITICAL: Restore Anki templates after sanitization
       const htmlWithTemplates = this.restoreAnkiTemplates(sanitizedHtml, templates)
@@ -535,10 +538,9 @@ export class SecureRenderer {
         mediaMap[ref] = mediaFile.cdnUrl
       } else if (mediaFile?.id) {
         try {
-          // If we have the media file but no CDN URL, get it from MediaService
-          const mediaRecord = await this.mediaService.getMediaFilesByCardId(mediaFile.id)
-          if (mediaRecord.length > 0) {
-            const url = this.mediaService.getMediaUrl(mediaRecord[0])
+          // Attempt to create an object URL from client-side storage (mediaHash in id)
+          const url = await mediaStorage.createObjectUrl(mediaFile.id)
+          if (url) {
             mediaMap[ref] = url
             // Cache the URL for future use
             mediaFile.cdnUrl = url

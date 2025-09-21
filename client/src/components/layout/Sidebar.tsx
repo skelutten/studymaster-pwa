@@ -13,10 +13,11 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     { name: 'Home', href: '/', icon: '🏠' },
     { name: 'Study', href: '/study', icon: '📚' },
     { name: 'Decks', href: '/decks', icon: '📋' },
-    { name: 'Global Stats', href: '/global-stats', icon: '🌍' },
+    { name: 'Global Stats', href: '/stats', icon: '🌍' },
     { name: 'Profile', href: '/profile', icon: '👤' },
     { name: 'Leaderboard', href: '/leaderboard', icon: '🏆' },
     { name: 'Challenges', href: '/challenges', icon: '🎯' },
+    { name: 'Storage', href: '/storage', icon: '💾' },
   ]
 
   // Format numbers for display
