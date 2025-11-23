@@ -26,9 +26,9 @@ interface AuthState {
   disconnectOnline: (provider: 'studymaster') => Promise<void>
   isOnlineLinked: (provider: 'studymaster') => Promise<boolean>
   
-  // PocketBase-specific Actions
-  signUp: (email: string, password: string, username: string) => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
+  // PocketBase-specific Actions (now private/internal)
+  // signUp: (email: string, password: string, username: string) => Promise<void>
+  // signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updatePassword: (newPassword: string) => Promise<void>
@@ -247,139 +247,201 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isLoading: false,
   error: null,
 
-  signUp: async (email: string, _password: string, username: string) => {
-    // Force local registration (server optional). Never calls PocketBase.
-    set({ isLoading: true, error: null })
-    debugLogger.info('[AUTH_STORE]', 'signUp - forcing local profile creation (server optional)')
-    const profile = await ensureLocalProfile()
-    await updateLocalProfile({ displayName: username })
-    const localUser: User = {
-      id: profile.deviceUserId,
-      email: email || 'local@device',
-      username: username || profile.displayName || 'You',
-      level: 1,
-      totalXp: 0,
-      coins: 0,
-      gems: 0,
-      createdAt: new Date(profile.createdAt).toISOString(),
-      lastActive: new Date().toISOString(),
-      preferences: {
-        theme: 'system',
-        language: 'en',
-        notifications: true,
-        soundEffects: true,
-        dailyGoal: 50,
-        timezone: 'UTC'
+  // Unified methods for components (FORCE LOCAL by default)
+  login: async (email: string, password: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      if (isRemoteAuthEnabled()) {
+        debugLogger.info('[AUTH_STORE]', 'Login - attempting remote auth via PocketBase');
+        const authData = await performPocketBaseAuth(email, password);
+        const user = await convertPocketbaseUser(authData.record);
+        set({
+          user,
+          session: authData,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        });
+        useDeckStore.getState().setCurrentUser(user.id);
+        await updateUserLastActive(user.id);
+      } else {
+        debugLogger.info('[AUTH_STORE]', 'Login - forcing local auth (remote disabled)');
+        const profile = await ensureLocalProfile();
+        const localUser: User = {
+          id: profile.deviceUserId,
+          email: 'local@device',
+          username: profile.displayName || 'You',
+          level: 1,
+          totalXp: 0,
+          coins: 0,
+          gems: 0,
+          createdAt: new Date(profile.createdAt).toISOString(),
+          lastActive: new Date().toISOString(),
+          preferences: {
+            theme: 'system',
+            language: 'en',
+            notifications: true,
+            soundEffects: true,
+            dailyGoal: 50,
+            timezone: 'UTC',
+          },
+        };
+        set({ user: localUser, session: null, isAuthenticated: true, isLoading: false, error: null });
+        useDeckStore.getState().setCurrentUser(localUser.id);
       }
+    } catch (error) {
+      const errorMessage = handleSignInError(error);
+      set({ error: errorMessage, isLoading: false });
+      throw new Error(errorMessage);
     }
-    set({ user: localUser, session: null, isAuthenticated: true, isLoading: false, error: null })
   },
 
-  signIn: async (_email: string, _password: string) => {
-    // Force local login (server optional). Never calls PocketBase.
-    set({ isLoading: true, error: null })
-    debugLogger.info('[AUTH_STORE]', 'signIn - forcing local auth (server optional)')
-    const profile = await ensureLocalProfile()
-    const localUser: User = {
-      id: profile.deviceUserId,
-      email: 'local@device',
-      username: profile.displayName || 'You',
-      level: 1,
-      totalXp: 0,
-      coins: 0,
-      gems: 0,
-      createdAt: new Date(profile.createdAt).toISOString(),
-      lastActive: new Date().toISOString(),
-      preferences: {
-        theme: 'system',
-        language: 'en',
-        notifications: true,
-        soundEffects: true,
-        dailyGoal: 50,
-        timezone: 'UTC'
+  register: async (email: string, username: string, password: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      if (isRemoteAuthEnabled()) {
+        debugLogger.info('[AUTH_STORE]', 'Register - attempting remote auth via PocketBase');
+        validateSignUpInputs(email, password, username);
+        const userData = createPocketBaseUserData(email, username, password);
+        const record = await pb.collection('users').create(userData);
+        const user = await convertPocketbaseUser(record);
+        set({
+          user,
+          session: { record, token: pb.authStore.token },
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        });
+        useDeckStore.getState().setCurrentUser(user.id);
+      } else {
+        debugLogger.info('[AUTH_STORE]', 'Register - forcing local profile creation (remote disabled)');
+        const profile = await ensureLocalProfile();
+        await updateLocalProfile({ displayName: username });
+        const localUser: User = {
+          id: profile.deviceUserId,
+          email: email || 'local@device',
+          username: username || profile.displayName || 'You',
+          level: 1,
+          totalXp: 0,
+          coins: 0,
+          gems: 0,
+          createdAt: new Date(profile.createdAt).toISOString(),
+          lastActive: new Date().toISOString(),
+          preferences: {
+            theme: 'system',
+            language: 'en',
+            notifications: true,
+            soundEffects: true,
+            dailyGoal: 50,
+            timezone: 'UTC',
+          },
+        };
+        set({
+          user: localUser,
+          session: null,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null,
+        });
+        useDeckStore.getState().setCurrentUser(localUser.id);
       }
+    } catch (error) {
+      const errorMessage = handleSignUpError(error);
+      set({ error: errorMessage, isLoading: false });
+      throw new Error(errorMessage);
     }
-    set({ user: localUser, session: null, isAuthenticated: true, isLoading: false, error: null })
-    useDeckStore.getState().setCurrentUser(localUser.id)
   },
 
+  logout: () => {
+    const { signOut } = get();
+    signOut();
+  },
+
+  updateUser: (updates: Partial<User>) => {
+    const { user } = get();
+    if (user) {
+      set({ user: { ...user, ...updates } });
+    }
+  },
+
+  // PocketBase-specific Actions
   signOut: async () => {
     debugLogger.log('[POCKETBASE]', 'START - signOut');
     
     try {
       debugLogger.log('[POCKETBASE]', 'Calling PocketBase authStore.clear');
-      pb.authStore.clear()
+      pb.authStore.clear();
       
       debugLogger.log('[POCKETBASE]', 'Clearing auth state');
       set({
         user: null,
         session: null,
         isAuthenticated: false,
-        error: null
-      })
-      useDeckStore.getState().setCurrentUser(null)
+        error: null,
+      });
+      useDeckStore.getState().setCurrentUser(null);
       
       debugLogger.log('[POCKETBASE]', 'END - signOut (success)');
     } catch (error) {
       debugLogger.error('[POCKETBASE]', 'SignOut error', {
         error,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       
       set({
-        error: error instanceof Error ? error.message : 'Logout failed'
-      })
+        error: error instanceof Error ? error.message : 'Logout failed',
+      });
     }
   },
 
   resetPassword: async (email: string) => {
     debugLogger.log('[POCKETBASE]', 'START - resetPassword', { email });
     
-    set({ isLoading: true, error: null })
+    set({ isLoading: true, error: null });
     
     try {
-      await pb.collection('users').requestPasswordReset(email)
+      await pb.collection('users').requestPasswordReset(email);
       
       set({
         isLoading: false,
-        error: null
-      })
+        error: null,
+      });
       
       debugLogger.log('[POCKETBASE]', 'END - resetPassword (success)');
     } catch (error) {
       debugLogger.error('[POCKETBASE]', 'Reset password error', {
         error,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       
-      let errorMessage = 'Password reset failed'
+      let errorMessage = 'Password reset failed';
       if (error instanceof Error) {
         if (error.message.includes('Invalid email')) {
-          errorMessage = 'Please enter a valid email address.'
+          errorMessage = 'Please enter a valid email address.';
         } else if (error.message.includes('not found')) {
-          errorMessage = 'No account found with this email address.'
+          errorMessage = 'No account found with this email address.';
         } else {
-          errorMessage = error.message
+          errorMessage = error.message;
         }
       }
       
       set({
         error: errorMessage,
-        isLoading: false
-      })
+        isLoading: false,
+      });
     }
   },
 
   updatePassword: async (newPassword: string) => {
     debugLogger.log('[POCKETBASE]', 'START - updatePassword', {
-      passwordLength: newPassword.length
+      passwordLength: newPassword.length,
     });
     
     const currentState = get();
     debugLogger.log('[POCKETBASE]', 'Current auth state', {
       hasUser: !!currentState.user,
       hasSession: !!currentState.session,
-      isAuthenticated: currentState.isAuthenticated
+      isAuthenticated: currentState.isAuthenticated,
     });
     
     set({ isLoading: true, error: null });
@@ -387,7 +449,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     try {
       // Validate password
       if (!newPassword || newPassword.length < 6) {
-        throw new Error("Password must be at least 6 characters long.");
+        throw new Error('Password must be at least 6 characters long.');
       }
 
       if (!currentState.user?.id) {
@@ -398,7 +460,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       await pb.collection('users').update(currentState.user.id, {
         password: newPassword,
-        passwordConfirm: newPassword
+        passwordConfirm: newPassword,
       });
 
       debugLogger.log('[POCKETBASE]', 'Password update successful');
@@ -410,12 +472,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "An unknown error occurred during password update.";
+          : 'An unknown error occurred during password update.';
       
       debugLogger.error('[POCKETBASE]', 'UpdatePassword failed', {
         error: errorMessage,
         errorType: error?.constructor?.name,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       
       set({ isLoading: false, error: errorMessage });
@@ -425,16 +487,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   updateProfile: async (updates: Partial<User>) => {
-    const { user } = get()
+    const { user } = get();
     
     debugLogger.log('[POCKETBASE]', 'START - updateProfile', {
       userId: user?.id,
-      updates: Object.keys(updates)
+      updates: Object.keys(updates),
     });
     
     if (!user) {
       debugLogger.warn('[POCKETBASE]', 'No user found for profile update');
-      return
+      return;
     }
     
     try {
@@ -445,32 +507,32 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         coins: updates.coins,
         gems: updates.gems,
         preferences: updates.preferences,
-        last_active: new Date().toISOString()
+        last_active: new Date().toISOString(),
       };
       
       debugLogger.log('[POCKETBASE]', 'Updating profile in database', updateData);
       
-      await pb.collection('users').update(user.id, updateData)
+      await pb.collection('users').update(user.id, updateData);
       
       debugLogger.log('[POCKETBASE]', 'Updating local user state');
-      set({ user: { ...user, ...updates } })
+      set({ user: { ...user, ...updates } });
       
       debugLogger.log('[POCKETBASE]', 'END - updateProfile (success)');
     } catch (error) {
       debugLogger.error('[POCKETBASE]', 'Profile update error', {
         error,
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
       
       set({
-        error: error instanceof Error ? error.message : 'Profile update failed'
-      })
+        error: error instanceof Error ? error.message : 'Profile update failed',
+      });
     }
   },
 
   clearError: () => {
     debugLogger.log('[POCKETBASE]', 'Clearing error state');
-    set({ error: null })
+    set({ error: null });
   },
 
   initializeAuth: async () => {
@@ -483,7 +545,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           email: pb.authStore.model.email
         });
         
-        const user = await convertPocketbaseUser(pb.authStore.model)
+        const user = await convertPocketbaseUser(pb.authStore.model);
         
         debugLogger.log('[POCKETBASE]', 'Setting authenticated state from initialization');
         set({
@@ -493,7 +555,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
             token: pb.authStore.token
           },
           isAuthenticated: true
-        })
+        });
       } else {
         // Fallback: bootstrap a local-only profile (no server required)
         debugLogger.info('[AUTH_STORE]', 'No remote session. Bootstrapping local profile.');
@@ -537,7 +599,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         user: null,
         session: null,
         isAuthenticated: false
-      })
+      });
     }
   },
 
@@ -574,81 +636,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!deviceUserId) return false;
     return isLinked(deviceUserId, provider);
   },
-
-  // Unified methods for components (FORCE LOCAL by default)
-  login: async (_email: string, _password: string) => {
-    debugLogger.info('[AUTH_STORE]', 'Login - forcing local auth (server optional)')
-    const profile = await ensureLocalProfile()
-    const localUser: User = {
-      id: profile.deviceUserId,
-      email: 'local@device',
-      username: profile.displayName || 'You',
-      level: 1,
-      totalXp: 0,
-      coins: 0,
-      gems: 0,
-      createdAt: new Date(profile.createdAt).toISOString(),
-      lastActive: new Date().toISOString(),
-      preferences: {
-        theme: 'system',
-        language: 'en',
-        notifications: true,
-        soundEffects: true,
-        dailyGoal: 50,
-        timezone: 'UTC'
-      }
-    }
-    set({ user: localUser, session: null, isAuthenticated: true, isLoading: false, error: null })
-  },
-
-  // Force local registration (server optional). Never calls PocketBase.
-  register: async (email: string, username: string, _password: string) => {
-    debugLogger.info('[AUTH_STORE]', 'Register - forcing local profile creation (server optional)')
-    const profile = await ensureLocalProfile()
-    // Persist desired display name locally
-    await updateLocalProfile({ displayName: username })
-    const localUser: User = {
-      id: profile.deviceUserId,
-      // Email is stored only for UX; not sent anywhere unless user links online features
-      email: email || 'local@device',
-      username: username || profile.displayName || 'You',
-      level: 1,
-      totalXp: 0,
-      coins: 0,
-      gems: 0,
-      createdAt: new Date(profile.createdAt).toISOString(),
-      lastActive: new Date().toISOString(),
-      preferences: {
-        theme: 'system',
-        language: 'en',
-        notifications: true,
-        soundEffects: true,
-        dailyGoal: 50,
-        timezone: 'UTC'
-      }
-    }
-    set({
-      user: localUser,
-      session: null,
-      isAuthenticated: true,
-      isLoading: false,
-      error: null
-    })
-    useDeckStore.getState().setCurrentUser(localUser.id)
-  },
-
-  logout: () => {
-    const { signOut } = get()
-    signOut()
-  },
-
-  updateUser: (updates: Partial<User>) => {
-    const { user } = get()
-    if (user) {
-      set({ user: { ...user, ...updates } })
-    }
-  }
-}))
 
 // Set up auth state change listener
 pb.authStore.onChange((token, record) => {
