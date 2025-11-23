@@ -16,6 +16,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import MapTestPage from './pages/MapTestPage'
 import DebugLogTestPage from './pages/DebugLogTestPage'
 import StoragePage from './pages/StoragePage'
+import AuthRoute from './components/AuthRoute' // Import AuthRoute
 
 // Development/testing pages - can be removed in production
 const isDev = import.meta.env.DEV
@@ -36,7 +37,7 @@ function AnalyticsRoute() {
 }
 
 function App() {
-  const { isAuthenticated, initializeAuth } = useAuthStore()
+  const { initializeAuth } = useAuthStore()
 
   useEffect(() => {
     initializeAuth()
@@ -48,23 +49,23 @@ function App() {
         <Route index element={<HomePage />} />
         <Route 
           path="/study/:deckId" 
-          element={isAuthenticated ? <StudyPage /> : <Navigate to="/" replace />} 
+          element={<AuthRoute><StudyPage /></AuthRoute>} 
         />
         <Route
           path="/enhanced-review/:deckId"
-          element={isAuthenticated ? <EnhancedReviewRoute /> : <Navigate to="/" replace />}
+          element={<AuthRoute><EnhancedReviewRoute /></AuthRoute>}
         />
         <Route 
           path="/decks" 
-          element={isAuthenticated ? <DecksPage /> : <Navigate to="/" replace />} 
+          element={<AuthRoute><DecksPage /></AuthRoute>} 
         />
         <Route 
           path="/profile" 
-          element={isAuthenticated ? <ProfilePage /> : <Navigate to="/" replace />} 
+          element={<AuthRoute><ProfilePage /></AuthRoute>} 
         />
         <Route 
           path="/challenges" 
-          element={isAuthenticated ? <ChallengesPage /> : <Navigate to="/" replace />} 
+          element={<AuthRoute><ChallengesPage /></AuthRoute>} 
         />
         <Route 
           path="/leaderboard" 
@@ -76,7 +77,7 @@ function App() {
         />
         <Route
           path="/analytics"
-          element={isAuthenticated ? <AnalyticsRoute /> : <Navigate to="/" replace />}
+          element={<AuthRoute><AnalyticsRoute /></AuthRoute>}
         />
         <Route
           path="/reset-password"
