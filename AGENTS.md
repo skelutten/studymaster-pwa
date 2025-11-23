@@ -5,7 +5,7 @@ This document outlines essential information and guidelines for AI agents contri
 ## Core Mandates
 
 - **Adhere to Project Conventions:** Always analyze existing code, tests, and configuration to match style, structure, and patterns.
-- **Tool Usage:** Verify library/framework usage within the project before employing new ones.
+- **Tool Usage:** Verify library/framework usage within the project before employing new ones. **Note:** The `replace` tool is highly sensitive to exact string matches (including whitespace, newlines, and indentation). For multi-line code modifications, it is often more reliable to read the entire file, perform string manipulation in memory, and then write the entire modified content back.
 - **Code Comments:** Add comments sparingly, focusing on *why* something is done, not *what*.
 - **Proactiveness:** Fulfill requests thoroughly, including implied follow-up actions.
 - **Confirm Ambiguity:** Seek clarification for significant actions outside clear request scope.
