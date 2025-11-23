@@ -55,6 +55,7 @@ cd pocketbase
 
 -   **Preferred Host:** Vercel (client and optionally server).
 -   **Details:** See `docs/deployment/README.md` for specific commands and environment management.
+-   **Vercel Workspaces Best Practice:** When deploying a monorepo with `npm` workspaces to Vercel, ensure that build commands for individual workspaces are correctly configured. For example, instead of `cd client && npm run build`, use `npm run build --workspace=client` in the root `package.json` scripts to ensure local binaries (like `vite`) are correctly found in the Vercel build environment.
 
 ## Project Conventions
 
