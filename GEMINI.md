@@ -1,97 +1,70 @@
-# Gemini Guide — StudyMaster PWA (Project-local Addendum)
+# GEMINI.md - StudyMaster PWA (Project-local Addendum)
 
-Purpose: Keep this as a lean, project-specific layer. Your home GEMINI.md and [AGENTS.md](AGENTS.md:1) are the sources of truth for global rules.
+This document provides project-specific guidelines for Gemini, supplementing the global rules.
 
-Scope and precedence
-- Follow your home GEMINI.md first (non‑negotiables, git protocol, testing policy, reasoning/output discipline).
-- Then follow [AGENTS.md](AGENTS.md:1) for workflow, coding standards, security, and AI behavior.
-- This file only adds StudyMaster specifics. If anything conflicts, prefer the home GEMINI.md.
+## Scope and Precedence
 
-Repo entry points
-- Frontend: React + TypeScript + Vite — [client/src/main.tsx](client/src/main.tsx:1), [client/src/App.tsx](client/src/App.tsx:1)
-- Shared types (frontend): [client/src/types/index.ts](client/src/types/index.ts:1), [client/src/types/api.ts](client/src/types/api.ts:1)
-- Documentation: [README.md](README.md:1), [docs/development/README.md](docs/development/README.md:1), [docs/deployment/README.md](docs/deployment/README.md:1)
-- Troubleshooting: [docs/development/troubleshooting.md](docs/development/troubleshooting.md:1)
+1.  **Global Rules:** Refer to your home `GEMINI.md` for non-negotiables (git protocol, testing policy, reasoning/output discipline).
+2.  **Project Standards:** Refer to `AGENTS.md` for workflow, coding standards, security, and AI behavior.
+3.  **StudyMaster Specifics:** This file outlines project-specific details. In case of conflict, global rules take precedence.
 
-Quickstart (day-to-day)
-- Install once per package, then run dev servers
-- Keep changes small; update docs when behavior changes
-- Run typecheck, lint, and tests before committing
+## Repository Entry Points
 
-Commands
+-   **Frontend:** `client/src/main.tsx`, `client/src/App.tsx`
+-   **Shared Types:** `client/src/types/index.ts`, `client/src/types/api.ts`
+-   **Documentation:** `README.md`, `docs/development/README.md`, `docs/deployment/README.md`
+-   **Troubleshooting:** `docs/development/troubleshooting.md`
+
+## Quickstart Commands
+
+Refer to the root `package.json` for a comprehensive list of scripts. Key commands include:
+
 ```bash
-# Install
-npm install
-cd client && npm install
-cd ../server && npm install
+# Install all dependencies (root, client, server, shared)
+npm run install:all
 
-# Dev (root scripts start both where available)
+# Start development servers (client and server)
 npm run dev
-# Or individually
-cd client && npm run dev
-cd server && npm run dev
 
-# Test and lint
-cd client && npm test
-cd server && npm test
+# Run tests (client and server)
+npm test
+
+# Run linters (client and server)
 npm run lint
-npm run lint:fix
 
-# Build
-cd client && npm run build
-cd server && npm run build
+# Build all (shared, client, server)
+npm run build
 ```
 
-PocketBase (local development)
+## PocketBase (Local Development)
+
 ```bash
 cd pocketbase
 ./pocketbase.exe serve --http 0.0.0.0:8090
-# PocketBase admin UI available at http://localhost:8090/_/
+# Admin UI: http://localhost:8090/_/
 # Database and auth handled automatically
 ```
 
-Environment configuration
-- Root env examples: [.env.example](.env.example:1), [.env.production.example](.env.production.example:1)
-- Client env examples: [client/.env.example](client/.env.example:1), [client/.env.production.example](client/.env.production.example:1)
-- Do not commit real secrets. Verify ignores:
-```bash
-git check-ignore .env.production
-git check-ignore client/.env.production
-```
+## Environment Configuration
 
-Deployment
-- Preferred host: Vercel (client and optionally server)
-```bash
-npm i -g vercel
-cd client && vercel --prod
-cd ../server && vercel --prod
-```
-- See [docs/deployment/README.md](docs/deployment/README.md:1) for details and env management.
+-   **Root:** `.env.example`, `.env.production.example`
+-   **Client:** `client/.env.example`, `client/.env.production.template`
+-   **Security:** Do not commit real secrets. Ensure `.gitignore` correctly ignores `.env.production` files.
 
-Project conventions (delta from global)
-- Tech stack: React + TypeScript + Vite on the client; Node/TypeScript on the server; PocketBase for data
-- Keep feature logic small and typed; colocate UI with component state; extract reusable utilities to [client/src/utils/](client/src/utils/debugLogger.ts:1)
-- Update documentation when adding features: [README.md](README.md:1) and relevant docs under [docs/](docs/features/README.md:1)
-- Avoid oversized files; refactor long modules into smaller units
+## Deployment
 
-Common tasks (high level)
-- Add feature
-  - Define/extend types under [client/src/types/](client/src/types/index.ts:1)
-  - Add API/backend logic in server (follow local patterns)
-  - Implement UI in [client/src/components/](client/src/components/UAMSComponent.tsx:1)
-  - Update state where applicable (e.g., [client/src/stores/](client/src/stores/deckStore.ts:1))
-  - Add tests near the change (e.g., [client/src/components/study/__tests__/](client/src/components/study/__tests__/SecureCardRenderer.test.tsx:1))
-- Debug
-  - Verify env vars and network requests in browser devtools
-  - Check local server logs and console output
-  - See [docs/development/troubleshooting.md](docs/development/troubleshooting.md:1)
+-   **Preferred Host:** Vercel (client and optionally server).
+-   **Details:** See `docs/deployment/README.md` for specific commands and environment management.
 
-Security and quality reminders
-- Never commit secrets; prefer env vars or secret managers
-- Keep dependency updates scoped; run tests after upgrades
-- Follow local code style and naming as seen in [client/src/components/](client/src/components/study/CardRenderer.tsx:1)
+## Project Conventions
 
-References
-- Global rules: your home GEMINI.md
-- Project standards: [AGENTS.md](AGENTS.md:1)
-- Project docs: [README.md](README.md:1), [docs/development/README.md](docs/development/README.md:1), [docs/deployment/README.md](docs/deployment/README.md:1), [docs/features/README.md](docs/features/README.md:1)
+-   **Tech Stack:** React + TypeScript + Vite (client); Node/TypeScript (server); PocketBase (data).
+-   **Code Structure:** Keep feature logic small and typed. Colocate UI with component state. Extract reusable utilities to `client/src/utils/`.
+-   **Documentation:** Update `README.md` and relevant `docs/` when adding features.
+-   **File Size:** Avoid oversized files; refactor long modules into smaller units.
+
+## Security and Quality Reminders
+
+-   Never commit secrets; prefer environment variables or secret managers.
+-   Keep dependency updates scoped; run tests after upgrades.
+-   Follow local code style and naming conventions.
