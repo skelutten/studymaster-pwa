@@ -1,90 +1,76 @@
-# 🤖 AI Agents Context for StudyMaster PWA
+# AGENTS.md - StudyMaster PWA Development Guide
 
-This document provides structured access to development resources, guidelines, and documentation specifically for AI agents working on the StudyMaster PWA project.
+This document outlines essential information and guidelines for AI agents contributing to the StudyMaster PWA project.
 
----
+## Core Mandates
 
-## 🚨 Critical Information
-*Essential security rules, current context, and memory - READ FIRST*
+- **Adhere to Project Conventions:** Always analyze existing code, tests, and configuration to match style, structure, and patterns.
+- **Tool Usage:** Verify library/framework usage within the project before employing new ones.
+- **Code Comments:** Add comments sparingly, focusing on *why* something is done, not *what*.
+- **Proactiveness:** Fulfill requests thoroughly, including implied follow-up actions.
+- **Confirm Ambiguity:** Seek clarification for significant actions outside clear request scope.
+- **Path Construction:** Always use absolute paths for file system tools.
+- **No Reverts:** Do not revert changes unless explicitly asked or due to an error.
 
-- **🔒 Security Guidelines**: [`.claude/security.md`](.claude/security.md) - Security protocols and best practices
-- **📍 Current Context**: [`.claude/context.md`](.claude/context.md) - Current project state and active development focus
-- **🧠 Memory & State**: [`.claude/memory.md`](.claude/memory.md) - Persistent memory and important decisions
+## Project Entry Points
 
----
+- **Frontend:** `client/src/main.tsx`, `client/src/App.tsx`
+- **Shared Types:** `client/src/types/index.ts`, `client/src/types/api.ts`
+- **Documentation:** `README.md`, `docs/development/README.md`, `docs/deployment/README.md`
+- **Troubleshooting:** `docs/development/troubleshooting.md`
 
-## ⚡ Development Essentials
-*Core workflow, standards, and AI behavior - Daily development needs*
+## Key Commands
 
-- **🔄 Development Workflow**: [`.claude/workflow.md`](.claude/workflow.md) - Step-by-step development process
-- **📋 Coding Standards**: [`.claude/coding-standards.md`](.claude/coding-standards.md) - Code quality and style guidelines
-- **🤖 AI Behavior Rules**: [`.claude/ai_behaviour.md`](.claude/ai_behaviour.md) - How AI agents should behave and respond
-- **📚 Quick Reference**: [`.claude/README.md`](.claude/README.md) - Overview and quick start guide
+```bash
+# Install
+npm install
+cd client && npm install
+cd server && npm install
 
----
+# Development Servers
+npm run dev # (from root, starts both client and server)
+# Or individually:
+cd client && npm run dev
+cd server && npm run dev
 
-## 📖 Comprehensive Guides
-*Detailed guides for specific development tasks and troubleshooting*
+# Test and Lint
+npm run lint # (from root, lints both client and server)
+npm run lint:fix
+cd client && npm test
+cd server && npm test
 
-- **⚡ Common Commands**: [`.claude/commands.md`](.claude/commands.md) - Frequently used CLI commands and shortcuts
-- **✅ Common Tasks**: [`.claude/common_tasks.md`](.claude/common_tasks.md) - Step-by-step task implementations
-- **🎨 UX Guidelines**: [`.claude/UX.md`](.claude/UX.md) - User experience design principles and patterns
-- **🔧 Troubleshooting**: [`.claude/troubleshooting.md`](.claude/troubleshooting.md) - Problem diagnosis and solutions
-- **🧪 Testing Guide**: [`.claude/test.md`](.claude/test.md) - Testing strategies and implementation
+# Build
+npm run build # (from root, builds shared, client, and server)
+# Or individually:
+cd client && npm run build
+cd server && npm run build
+```
 
----
+## Environment Configuration
 
-## 🔗 Reference Materials
-*Design references, documentation links, and resource collections*
+- **Root:** `.env.example`, `.env.production.example`
+- **Client:** `client/.env.example`, `client/.env.production.template`
+- **Security:** Never commit real secrets. Verify `.gitignore` for `.env.production` and `client/.env.production`.
 
-- **📎 References**: [`.claude/references.md`](.claude/references.md) - External links, APIs, and resource collections
-- **📁 Folder Documentation**: Project structure and organization guides
+## Deployment (Vercel)
 
----
+- **Client & Server:** `npm i -g vercel`, then `cd client && vercel --prod`, `cd server && vercel --prod`
+- **Details:** Refer to `docs/deployment/README.md` for environment management.
 
-## 📚 External Documentation
-*Project-wide documentation and deployment resources*
+## Project Conventions
 
-### Core Project Documentation
-- **📖 Main Documentation**: [`README.md`](README.md) - Project overview and setup
-- **🚀 Getting Started**: [`docs/getting-started/README.md`](docs/getting-started/README.md) - Initial setup and onboarding
-- **⚙️ Development Guide**: [`docs/development/README.md`](docs/development/README.md) - Development environment and practices
+- **Tech Stack:** React + TypeScript + Vite (client); Node/TypeScript (server); PocketBase (data).
+- **Code Structure:** Keep feature logic small, typed. Colocate UI with component state. Extract reusable utilities to `client/src/utils/`.
+- **Documentation:** Update `README.md` and relevant `docs/` files when adding features.
+- **File Size:** Avoid oversized files; refactor long modules.
 
-### Deployment & Operations
-- **🚀 Deployment Guide**: [`docs/deployment/README.md`](docs/deployment/README.md) - Production deployment process
-- **🔐 Security Setup**: [`docs/security/README.md`](docs/security/README.md) - Security configuration and best practices
+## Security and Quality
 
-### Specialized Resources
-- **🎯 Feature Documentation**: [`docs/features/README.md`](docs/features/README.md) - Feature specifications and implementation
-- **🤝 Contributing Guide**: [`docs/contributing/README.md`](docs/contributing/README.md) - Contribution guidelines and processes
+- Never commit secrets. Use environment variables.
+- Scope dependency updates; run tests after upgrades.
+- Follow local code style and naming conventions.
 
----
+## References
 
-## 🎯 Quick Navigation Tips for AI Agents
-
-- **🆘 Need Help?** Start with [`.claude/troubleshooting.md`](.claude/troubleshooting.md)
-- **🔧 Development Issue?** Check [`.claude/workflow.md`](.claude/workflow.md) and [`.claude/coding-standards.md`](.claude/coding-standards.md)
-- **🚀 Deployment?** Go to [`docs/deployment/README.md`](docs/deployment/README.md)
-- **🔒 Security Question?** Review [`.claude/security.md`](.claude/security.md) and [`docs/security/README.md`](docs/security/README.md)
-- **🎨 UX/Design?** Reference [`.claude/UX.md`](.claude/UX.md) and design documentation
-
----
-
-## 🤖 Agent-Specific Guidelines
-
-When working on this project, AI agents should:
-
-1. **Always read the critical information first** - Security, context, and memory files contain essential project state
-2. **Follow the established workflow** - Use the development workflow for consistent processes
-3. **Adhere to coding standards** - Maintain code quality and consistency
-4. **Respect AI behavior rules** - Follow the established patterns for agent interactions
-5. **Use common tasks and commands** - Leverage documented procedures for efficiency
-
-### Legacy References
-- `docs/PLAN.md`: Project phases and decisions
-- `docs/accounts.md`: User accounts and authentication flow
-- `docs/StudyMaster-Design-Plan.md`: Original design plan
-
----
-
-*Last Updated: 2025-08-03 | Structure Version: 1.0*
+- **Global Rules:** Your home `GEMINI.md`
+- **Project Docs:** `README.md`, `docs/development/README.md`, `docs/deployment/README.md`, `docs/features/README.md`
