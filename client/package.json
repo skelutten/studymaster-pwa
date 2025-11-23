@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:analyze": "ANALYZE=true vite build",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "test": "vitest",
     "test:performance": "vitest --reporter=verbose --testNamePattern=performance",

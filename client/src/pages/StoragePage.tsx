@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { storageManager, type StorageUsage, type PurgeReport } from '../services/storage/StorageManager';
+import db from '../data/db';
 
 function formatBytes(bytes?: number): string {
   if (!bytes && bytes !== 0) return 'N/A';
@@ -14,6 +15,7 @@ const StoragePage: React.FC = () => {
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [loading, setLoading] = useState(false);
   const [purging, setPurging] = useState<null | 'unused' | 'all'>(null);
+  const [clearing, setClearing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +66,45 @@ const StoragePage: React.FC = () => {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setPurging(null);
+    }
+  };
+
+  const onClearAllData = async () => {
+    if (!confirm('⚠️ WARNING: This will delete ALL data including decks, cards, reviews, achievements, and media. This action CANNOT be undone. Are you sure?')) {
+      return;
+    }
+    if (!confirm('This is your last chance. Click OK to permanently delete all data.')) {
+      return;
+    }
+    setClearing(true);
+    setError(null);
+    setMessage(null);
+    try {
+      // Clear all IndexedDB tables
+      await db.transaction('rw', db.decks, db.cards, db.reviews, db.media, db.achievements, db.leaderboardCache, db.syncQueue, db.mediaAnalytics, db.userOnlineLinks, async () => {
+        await db.decks.clear();
+        await db.cards.clear();
+        await db.reviews.clear();
+        await db.media.clear();
+        await db.achievements.clear();
+        await db.leaderboardCache.clear();
+        await db.syncQueue.clear();
+        await db.mediaAnalytics.clear();
+        await db.userOnlineLinks.clear();
+      });
+
+      // Clear localStorage (zustand stores)
+      localStorage.clear();
+
+      setMessage('All data cleared successfully. Reloading app...');
+
+      // Reload the page after a short delay
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setClearing(false);
     }
   };
 
@@ -183,6 +224,22 @@ const StoragePage: React.FC = () => {
             </div>
           )}
         </dl>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="mt-6 rounded-lg border border-red-300 bg-red-50 p-4 shadow-sm dark:border-red-700 dark:bg-red-900/20">
+        <h2 className="mb-3 text-lg font-medium text-red-900 dark:text-red-100">⚠️ Danger Zone</h2>
+        <p className="mb-4 text-sm text-red-800 dark:text-red-200">
+          This action will permanently delete all your data including decks, cards, study progress, achievements, and media files.
+          This is useful for testing or if you want to start fresh.
+        </p>
+        <button
+          onClick={onClearAllData}
+          disabled={clearing || purging !== null}
+          className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          {clearing ? 'Clearing all data...' : 'Clear All Data'}
+        </button>
       </div>
     </div>
   );

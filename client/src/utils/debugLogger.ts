@@ -5,7 +5,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 type LogLevel = 'log' | 'warn' | 'error' | 'info';
-type LogPrefix = '[RESET_PASSWORD]' | '[AUTH_STORE]' | '[POCKETBASE]' | '[AUTH_MODAL]' | '[SESSION]';
+type LogPrefix =
+  | '[RESET_PASSWORD]'
+  | '[AUTH_STORE]'
+  | '[POCKETBASE]'
+  | '[AUTH_MODAL]'
+  | '[SESSION]'
+  | '[MEDIA_CONTEXT]'
+  | '[MEDIA_CONTEXT_OPT]'
+  | '[MEDIA_AUTH]'
+  | '[MEDIA_SECURITY]'
+  | '[USER_DATA_SERVICE]';
 
 interface LogEntry {
   timestamp: string;

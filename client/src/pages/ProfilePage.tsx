@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { useDeckStore } from '../stores/deckStore'
 import { useGamificationStore } from '../stores/gamificationStore'
@@ -6,9 +6,11 @@ import { userDataService, type AuthenticatedUser, type UserStats as DynamicUserS
 import XPBar from '../components/gamification/XPBar'
 import StreakCounter from '../components/gamification/StreakCounter'
 import ConfirmationDialog from '../components/ui/ConfirmationDialog'
+import { isOnlineLeaderboardEnabled, setOnlineLeaderboardEnabled } from '../config/featureFlags'
+import { downloadExport, importFromFile } from '../services/exportImportService'
 
 const ProfilePage = () => {
-  const { user, updateUser, isLoading, initializeAuth } = useAuthStore()
+  const { user, updateUser, isLoading, initializeAuth, connectOnline, disconnectOnline, isOnlineLinked } = useAuthStore()
   
   // Dynamic data state
   const [, setUserStats] = useState<DynamicUserStats | null>(null)
@@ -105,6 +107,84 @@ const ProfilePage = () => {
     dailyGoal: user?.preferences.dailyGoal || 50
   })
 
+  // Online features + account link (optional)
+  const [onlineEnabled, setOnlineEnabled] = useState<boolean>(isOnlineLeaderboardEnabled())
+  const [linkForm, setLinkForm] = useState<{ serverUserId: string; accessToken: string; refreshToken: string }>({
+    serverUserId: '',
+    accessToken: '',
+    refreshToken: ''
+  })
+  const [linking, setLinking] = useState(false)
+  const [linked, setLinked] = useState<boolean | null>(null)
+  const [accountError, setAccountError] = useState<string | null>(null)
+  const [accountSuccess, setAccountSuccess] = useState<string | null>(null)
+
+  // Export / Import state
+  const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [exportMessage, setExportMessage] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Load initial linked status for the default provider "studymaster"
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      try {
+        const result = await isOnlineLinked('studymaster')
+        if (!cancelled) setLinked(result)
+      } catch {
+        if (!cancelled) setLinked(false)
+      }
+    }
+    if (user) void run()
+    return () => { cancelled = true }
+  }, [user, isOnlineLinked])
+
+  const handleToggleOnline = () => {
+    const next = !onlineEnabled
+    setOnlineEnabled(next)
+    setOnlineLeaderboardEnabled(next)
+  }
+
+  const handleConnectOnline = async () => {
+    setLinking(true)
+    setAccountError(null)
+    setAccountSuccess(null)
+    try {
+      await connectOnline('studymaster', {
+        serverUserId: linkForm.serverUserId.trim(),
+        accessToken: linkForm.accessToken.trim(),
+        refreshToken: linkForm.refreshToken?.trim() || undefined,
+        scopes: ['leaderboard:read', 'leaderboard:write']
+      })
+      setLinked(true)
+      setLinkForm({ serverUserId: '', accessToken: '', refreshToken: '' })
+      setAccountSuccess('Online account linked successfully.')
+    } catch (e) {
+      setAccountError(e instanceof Error ? e.message : 'Failed to link account')
+    } finally {
+      setLinking(false)
+    }
+  }
+
+  const handleDisconnectOnline = async () => {
+    setLinking(true)
+    setAccountError(null)
+    setAccountSuccess(null)
+    try {
+      await disconnectOnline('studymaster')
+      setLinked(false)
+      setAccountSuccess('Online account disconnected.')
+    } catch (e) {
+      setAccountError(e instanceof Error ? e.message : 'Failed to disconnect account')
+    } finally {
+      setLinking(false)
+    }
+  }
+
   const handleSaveProfile = () => {
     if (user) {
       updateUser({
@@ -200,6 +280,46 @@ const ProfilePage = () => {
         </div>
       </div>
     )
+  }
+
+  // Export / Import handlers
+  const handleExportData = async () => {
+    setExporting(true)
+    setExportError(null)
+    setExportMessage(null)
+    try {
+      await downloadExport()
+      setExportMessage('Export downloaded.')
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleImportFileChange = async (e: any) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportError(null)
+    setImportMessage(null)
+    try {
+      const res = await importFromFile(file, { includeEphemeral: false, overwriteSettings: true })
+      const parts: string[] = []
+      if (res.counts?.decks) parts.push(`${res.counts.decks} decks`)
+      if (res.counts?.cards) parts.push(`${res.counts.cards} cards`)
+      if (res.counts?.reviews) parts.push(`${res.counts.reviews} reviews`)
+      setImportMessage(`Imported successfully${parts.length ? ` (${parts.join(', ')})` : ''}.`)
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
   }
 
   return (
@@ -510,6 +630,115 @@ const ProfilePage = () => {
             )}
           </div>
 
+          {/* Account & Online Services */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Account & Online Services
+            </h3>
+
+            <div className="space-y-4">
+              {/* Online Leaderboard Toggle */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Enable online leaderboards (optional)
+                </span>
+                <div
+                  role="switch"
+                  aria-checked={onlineEnabled}
+                  tabIndex={0}
+                  onClick={handleToggleOnline}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleToggleOnline() }}
+                  className={`w-12 h-6 rounded-full cursor-pointer transition-colors ${
+                    onlineEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                  title="Toggle online leaderboard"
+                >
+                  <div
+                    className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
+                      onlineEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                    } mt-0.5`}
+                  />
+                </div>
+              </div>
+
+              {/* Link status */}
+              <div className="flex items-center justify-between">
+                <div className="text-sm">
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      linked
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+                        : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {linked ? 'Linked to StudyMaster Online' : 'Not linked'}
+                  </span>
+                </div>
+                {linked && (
+                  <button
+                    onClick={handleDisconnectOnline}
+                    disabled={linking}
+                    className="px-3 py-1 rounded bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {linking ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                )}
+              </div>
+
+              {/* Link form (only when online enabled and not linked) */}
+              {onlineEnabled && linked === false && (
+                <div className="space-y-3">
+                  {accountError && (
+                    <div className="text-sm text-red-600 dark:text-red-400">{accountError}</div>
+                  )}
+                  {accountSuccess && (
+                    <div className="text-sm text-emerald-600 dark:text-emerald-400">{accountSuccess}</div>
+                  )}
+                  <div className="grid grid-cols-1 gap-3">
+                    <input
+                      type="text"
+                      value={linkForm.serverUserId}
+                      onChange={(e) => setLinkForm({ ...linkForm, serverUserId: e.target.value })}
+                      placeholder="Server User ID"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="password"
+                      value={linkForm.accessToken}
+                      onChange={(e) => setLinkForm({ ...linkForm, accessToken: e.target.value })}
+                      placeholder="Access Token"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="password"
+                      value={linkForm.refreshToken}
+                      onChange={(e) => setLinkForm({ ...linkForm, refreshToken: e.target.value })}
+                      placeholder="Refresh Token (optional)"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end">
+                    <button
+                      onClick={handleConnectOnline}
+                      disabled={linking || !linkForm.serverUserId.trim() || !linkForm.accessToken.trim()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {linking ? 'Connecting…' : 'Connect'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Privacy copy */}
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Online features are optional. Your study data and media are stored locally in your browser
+                (IndexedDB/OPFS). Nothing is uploaded unless you explicitly enable online features and link
+                your account. Tokens are stored securely in local storage (IndexedDB) and are never written to
+                localStorage or cookies.
+              </div>
+            </div>
+          </div>
+
           {/* Settings */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -568,7 +797,59 @@ const ProfilePage = () => {
               </div>
             </div>
             
-            {/* Reset Data Section */}
+           {/* Backup & Restore */}
+           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+             <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-3">
+               Backup & Restore
+             </h4>
+
+             {/* Messages */}
+             <div className="space-y-1 mb-2">
+               {exportError && (
+                 <div className="text-sm text-red-600 dark:text-red-400">{exportError}</div>
+               )}
+               {exportMessage && (
+                 <div className="text-sm text-emerald-600 dark:text-emerald-400">{exportMessage}</div>
+               )}
+               {importError && (
+                 <div className="text-sm text-red-600 dark:text-red-400">{importError}</div>
+               )}
+               {importMessage && (
+                 <div className="text-sm text-emerald-600 dark:text-emerald-400">{importMessage}</div>
+               )}
+             </div>
+
+             <div className="flex items-center gap-3">
+               <button
+                 onClick={handleExportData}
+                 disabled={exporting}
+                 className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+               >
+                 {exporting ? 'Exporting…' : 'Export JSON'}
+               </button>
+               <button
+                 onClick={handleImportClick}
+                 disabled={importing}
+                 className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
+               >
+                 {importing ? 'Importing…' : 'Import JSON'}
+               </button>
+               <input
+                 ref={fileInputRef}
+                 type="file"
+                 accept="application/json"
+                 className="hidden"
+                 onChange={handleImportFileChange}
+               />
+             </div>
+
+             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+               Export excludes media blobs (manifest only). Import upserts data into your local IndexedDB.
+               No data leaves your device unless you enable optional online features.
+             </p>
+           </div>
+
+           {/* Reset Data Section */}
             <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
               <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-3">
                 Data Management

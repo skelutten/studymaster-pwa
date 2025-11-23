@@ -17,6 +17,11 @@ export const useAuth = () => {
   const updateUser = useAuthStore((state) => state.updateUser)
   const clearError = useAuthStore((state) => state.clearError)
   
+  // Local + Online Link helpers
+  const connectOnline = useAuthStore((state) => state.connectOnline)
+  const disconnectOnline = useAuthStore((state) => state.disconnectOnline)
+  const isOnlineLinked = useAuthStore((state) => state.isOnlineLinked)
+
   // PocketBase specific methods
   const signIn = useAuthStore((state) => state.signIn)
   const signUp = useAuthStore((state) => state.signUp)
@@ -26,15 +31,14 @@ export const useAuth = () => {
   const updateProfile = useAuthStore((state) => state.updateProfile)
   const initializeAuth = useAuthStore((state) => state.initializeAuth)
 
-  // Enhanced user object with token for API requests
-  const userWithToken = user && session ? {
-    ...user,
-    token: session.token
-  } : null
+  // Enhanced user object with token for API requests when available (do NOT nullify local user)
+  const userWithOptionalToken = user
+    ? (session ? { ...user, token: session.token } : user)
+    : null
 
   return {
     // State
-    user: userWithToken, // Enhanced user object with token
+    user: userWithOptionalToken, // Keep local user; add token only when session exists
     session,
     isAuthenticated,
     isLoading,
@@ -46,6 +50,11 @@ export const useAuth = () => {
     logout,
     updateUser,
     clearError,
+
+    // Local + Online Link helpers
+    connectOnline,
+    disconnectOnline,
+    isOnlineLinked,
     
     // PocketBase specific methods
     signIn,

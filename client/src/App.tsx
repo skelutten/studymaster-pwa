@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { useEffect } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Layout from './components/layout/Layout'
 import HomePage from './pages/HomePage'
@@ -31,11 +32,15 @@ function AnalyticsRoute() {
   const { user } = useAuthStore();
   const userId = user?.id ?? 'local-user';
   // Provide a sensible default time range; component should handle this
-  return <AnalyticsDashboard userId={userId} timeRange={'last30Days' as any} />;
+  return <AnalyticsDashboard userId={userId} timeRange={'30d'} />;
 }
 
 function App() {
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, initializeAuth } = useAuthStore()
+
+  useEffect(() => {
+    initializeAuth()
+  }, [initializeAuth])
 
   return (
     <Routes>

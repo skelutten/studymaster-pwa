@@ -2,6 +2,14 @@ import { pb } from '../../lib/pocketbase'
 import { debugLogger } from '../../utils/debugLogger'
 
 export class MediaAuthService {
+  constructor() {
+    // Expose last created instance for tests to inject spies without changing call sites
+    try {
+      (globalThis as any).__lastMediaAuthInstance = this
+    } catch {
+      // no-op for non-standard environments
+    }
+  }
   /**
    * Validate that user has access to specific media file
    */

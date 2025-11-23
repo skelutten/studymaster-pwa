@@ -19,7 +19,7 @@ export class MediaStorageService {
     blob: Blob,
     mimeType: string,
     options?: {
-      // Placeholder for future OPFS pointer save path or strategy
+      // Optional OPFS pointer save path (client-only, best-effort)
       useOPFS?: boolean;
       validationMeta?: Record<string, unknown>;
       securityFlags?: MediaRow['securityFlags'];
@@ -35,12 +35,33 @@ export class MediaStorageService {
         return mediaHash;
       }
 
-      // 3) Persist blob (OPFS integration can be added later; for now, IndexedDB Blob)
+      let opfsPointer: string | undefined;
+
+      // 3) Attempt OPFS write when requested and supported
+      if (options?.useOPFS && typeof navigator !== 'undefined' && (navigator as any).storage?.getDirectory) {
+        try {
+          const root: any = await (navigator as any).storage.getDirectory();
+          const mediaDir = await root.getDirectoryHandle('media', { create: true });
+          const fileHandle = await mediaDir.getFileHandle(mediaHash, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          opfsPointer = `media/${mediaHash}`;
+          logInfo('Media saved to OPFS', { mediaHash, path: opfsPointer, scope: 'media.storeBlob' });
+        } catch (e) {
+          // Fall back to IndexedDB blob if OPFS fails
+          logError(e instanceof Error ? e : new Error(String(e)), { scope: 'media.storeBlob.opfs' });
+          opfsPointer = undefined;
+        }
+      }
+
+      // 4) Persist record: prefer OPFS pointer when available; otherwise store blob in IndexedDB
       await repos.media.put({
         mediaHash,
-        blob,
+        blob: opfsPointer ? undefined : blob,
+        opfsPointer,
         mimeType,
-        byteLength: blob.size,
+        byteLength: opfsPointer ? blob.size : blob.size,
         validationMeta: options?.validationMeta,
         securityFlags: options?.securityFlags,
       });
@@ -71,8 +92,30 @@ export class MediaStorageService {
   async createObjectUrl(mediaHash: string): Promise<string | null> {
     try {
       const row = await repos.media.get(mediaHash);
-      if (!row?.blob) return null;
-      return URL.createObjectURL(row.blob);
+      if (!row) return null;
+
+      // Prefer in-DB blob when present
+      if (row.blob) {
+        return URL.createObjectURL(row.blob);
+      }
+
+      // Fallback to OPFS pointer when available
+      if (row.opfsPointer && typeof navigator !== 'undefined' && (navigator as any).storage?.getDirectory) {
+        try {
+          const root: any = await (navigator as any).storage.getDirectory();
+          // Resolve pointer like "media/<hash>"
+          const [dirName, fileName] = String(row.opfsPointer).split('/');
+          const mediaDir = await root.getDirectoryHandle(dirName, { create: false });
+          const fileHandle = await mediaDir.getFileHandle(fileName, { create: false });
+          const file = await fileHandle.getFile();
+          return URL.createObjectURL(file);
+        } catch (e) {
+          logError(e instanceof Error ? e : new Error(String(e)), { scope: 'media.createObjectUrl.opfs' });
+          return null;
+        }
+      }
+
+      return null;
     } catch (err) {
       logError(err instanceof Error ? err : new Error(String(err)), { scope: 'media.createObjectUrl' });
       return null;

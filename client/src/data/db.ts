@@ -104,12 +104,40 @@ export interface AchievementRow {
   meta?: Record<string, unknown>;
 }
 
+/**
+ * Lightweight, local-only media analytics per deck/media
+ * Incremented on each media access; used for client-side insights only
+ */
+export interface MediaAnalyticsRow {
+  id?: number; // auto-increment
+  deckId: string;
+  mediaId: string;
+  accessCount: number;
+  lastAccessed: number; // epoch ms
+}
+
 export interface ChallengeRow {
   challengeId: string;
   config?: Record<string, unknown>;
   progress?: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
+}
+
+/**
+ * Optional online link for a local user profile
+ * Stored only when the user opts in to connect online features
+ */
+export interface UserOnlineLinkRow {
+  linkKey: string; // `${deviceUserId}:${provider}`
+  deviceUserId: string;
+  provider: 'studymaster' | 'custom';
+  serverUserId: string;
+  accessToken: string;
+  refreshToken?: string;
+  scopes?: string[];
+  lastLinkedAt: number;
+  meta?: Record<string, unknown>;
 }
 
 export interface LeaderboardCacheRow {
@@ -149,6 +177,8 @@ export class StudyMasterDB extends Dexie {
   challenges!: Table<ChallengeRow, ChallengeRow['challengeId']>;
   leaderboardCache!: Table<LeaderboardCacheRow, LeaderboardCacheRow['scope']>;
   syncQueue!: Table<SyncQueueRow, SyncQueueRow['queueId']>;
+  mediaAnalytics!: Table<MediaAnalyticsRow, number>;
+  userOnlineLinks!: Table<UserOnlineLinkRow, string>;
 
   constructor() {
     super('studymaster');
@@ -168,6 +198,16 @@ export class StudyMasterDB extends Dexie {
       syncQueue: 'queueId, createdAt',
     });
 
+    // Version 2: add mediaAnalytics store
+    this.version(2).stores({
+      mediaAnalytics: '++id, deckId, mediaId, lastAccessed'
+    });
+
+    // Version 3: add userOnlineLinks store
+    this.version(3).stores({
+      userOnlineLinks: 'linkKey, deviceUserId, provider'
+    });
+
     // Table bindings (in Dexie v3 this is automatic; explicit assignment keeps TS happy in some setups)
     this.settings = this.table('settings');
     this.users = this.table('users');
@@ -179,6 +219,8 @@ export class StudyMasterDB extends Dexie {
     this.challenges = this.table('challenges');
     this.leaderboardCache = this.table('leaderboardCache');
     this.syncQueue = this.table('syncQueue');
+    this.mediaAnalytics = this.table('mediaAnalytics');
+    this.userOnlineLinks = this.table('userOnlineLinks');
 
     // Lifecycle hooks for visibility and troubleshooting
     this.on('populate', async () => {
@@ -279,6 +321,8 @@ export async function validateSchema(): Promise<{ ok: boolean; missing: string[]
     'challenges',
     'leaderboardCache',
     'syncQueue',
+    'mediaAnalytics',
+    'userOnlineLinks',
   ];
   const actual = db.tables.map((t) => t.name);
   const missing = expected.filter((name) => !actual.includes(name));

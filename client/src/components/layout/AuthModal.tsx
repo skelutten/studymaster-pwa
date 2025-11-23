@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../../stores/authStore'
+import { isRemoteAuthEnabled } from '../../config/featureFlags'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -14,6 +15,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
   const [password, setPassword] = useState('')
   const { login, register, isLoading, error, clearError, isAuthenticated } = useAuthStore()
   const [resetEmailSent, setResetEmailSent] = useState(false)
+  const remoteAuthEnabled = isRemoteAuthEnabled()
 
   // Clear errors when modal opens or mode changes
   useEffect(() => {
@@ -66,8 +68,8 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
 
   const handleDemoLogin = async () => {
     try {
-      // Use demo credentials that trigger the bypass logic
-      await signIn('demo', '')
+      // Use unified login; in local-first mode (remote auth disabled) this authenticates locally
+      await login('demo', '')
       onClose()
     } catch (error) {
       // Error is handled by the store
@@ -100,6 +102,12 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
                 </div>
               )}
 
+              {!remoteAuthEnabled && (
+                <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                  Local account: no server signup required. You can link an online account later in Profile → Account & Online Services.
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <input
@@ -125,7 +133,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
                   </div>
                 )}
                 
-                {mode !== 'forgot-password' && (
+                {mode !== 'forgot-password' && remoteAuthEnabled && (
                   <div>
                     <input
                       type="password"
@@ -133,7 +141,7 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      required
+                      required={remoteAuthEnabled}
                     />
                   </div>
                 )}
@@ -143,9 +151,9 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
                   disabled={isLoading}
                   className="w-full btn btn-primary"
                 >
-                  {isLoading ? 'Loading...' : 
-                   mode === 'login' ? 'Sign In' : 
-                   mode === 'register' ? 'Create Account' : 
+                  {isLoading ? 'Loading...' :
+                   mode === 'login' ? (remoteAuthEnabled ? 'Sign In' : 'Sign In (Local)') :
+                   mode === 'register' ? (remoteAuthEnabled ? 'Create Account' : 'Create Local Profile') :
                    'Send Reset Email'}
                 </button>
               </form>
@@ -169,18 +177,20 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
                         onClick={() => handleModeChange('register')}
                         className="text-blue-600 hover:text-blue-500"
                       >
-                        Create one
+                        {remoteAuthEnabled ? 'Create one' : 'Create local profile'}
                       </button>
                     </div>
-                    <div>
-                      Forgot your password?{' '}
-                      <button
-                        onClick={() => handleModeChange('forgot-password')}
-                        className="text-blue-600 hover:text-blue-500"
-                      >
-                        Reset it
-                      </button>
-                    </div>
+                    {remoteAuthEnabled && (
+                      <div>
+                        Forgot your password?{' '}
+                        <button
+                          onClick={() => handleModeChange('forgot-password')}
+                          className="text-blue-600 hover:text-blue-500"
+                        >
+                          Reset it
+                        </button>
+                      </div>
+                    )}
                   </>
                 ) : mode === 'register' ? (
                   <div>
@@ -189,12 +199,12 @@ const AuthModal = ({ isOpen, onClose, mode, onModeChange }: AuthModalProps) => {
                       onClick={() => handleModeChange('login')}
                       className="text-blue-600 hover:text-blue-500"
                     >
-                      Sign in
+                      {remoteAuthEnabled ? 'Sign in' : 'Sign in (Local)'}
                     </button>
                   </div>
                 ) : (
                   <div>
-                    Remember your password?{' '}
+                    {remoteAuthEnabled ? 'Remember your password? ' : 'Password reset is unavailable in local mode. '}
                     <button
                       onClick={() => handleModeChange('login')}
                       className="text-blue-600 hover:text-blue-500"

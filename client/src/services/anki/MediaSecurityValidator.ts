@@ -18,10 +18,12 @@ export interface ValidationResult {
   fileSignature: string
   threats: SecurityThreat[]
   warnings: string[]
+  securityWarnings: string[]
   cleanedBuffer: ArrayBuffer
   metadataStripped: boolean
   originalSize: number
   cleanedSize: number
+  validationTime: number
 }
 
 export class MediaSecurityValidator {
@@ -50,20 +52,50 @@ export class MediaSecurityValidator {
   ]
 
   async validateFileContent(buffer: ArrayBuffer, filename: string): Promise<ValidationResult> {
-    debugLogger.info('[MEDIA_SECURITY]', 'Starting deep file validation', { 
+    const start = Date.now()
+    debugLogger.info('[MEDIA_SECURITY]', 'Starting deep file validation', {
       filename,
       size: buffer.byteLength
     })
-
+  
     const threats: SecurityThreat[] = []
     const warnings: string[] = []
+    const securityWarnings: string[] = []
+  
+    // Treat empty files as invalid
+    if (buffer.byteLength === 0) {
+      threats.push({
+        type: 'EMPTY_FILE',
+        severity: 'CRITICAL',
+        description: 'File is empty',
+        recommendation: 'Reject file'
+      })
+      return {
+        isValid: false,
+        detectedMimeType: 'application/octet-stream',
+        mediaType: 'unknown',
+        canOptimize: false,
+        dimensions: undefined,
+        duration: undefined,
+        fileSignature: await this.generateFileSignature(buffer),
+        threats,
+        warnings,
+        securityWarnings: ['Content validation failed - file may be malicious'],
+        cleanedBuffer: buffer,
+        metadataStripped: false,
+        originalSize: 0,
+        cleanedSize: 0,
+        validationTime: Date.now() - start
+      }
+    }
+  
     const uint8Array = new Uint8Array(buffer)
-
+  
     // 1. Magic number validation (prevent file type spoofing)
-    const detectedType = this.detectActualFileType(uint8Array)
+    const detectedType = this.detectActualFileType(uint8Array, filename)
     const expectedType = this.getMimeFromExtension(filename)
     
-    if (detectedType !== expectedType) {
+    if (detectedType !== expectedType && expectedType !== 'application/octet-stream') {
       threats.push({
         type: 'FILE_TYPE_MISMATCH',
         severity: 'HIGH',
@@ -71,7 +103,7 @@ export class MediaSecurityValidator {
         recommendation: 'Reject file or force correct extension'
       })
     }
-
+  
     // 2. Content scanning for embedded threats
     if (detectedType.startsWith('image/')) {
       const imageThreats = await this.scanImageContent(uint8Array, filename)
@@ -80,21 +112,28 @@ export class MediaSecurityValidator {
       const audioThreats = await this.scanAudioContent(uint8Array, filename)
       threats.push(...audioThreats)
     }
-
+  
     // 3. Generic pattern scanning
     const textContent = this.extractTextFromBinary(uint8Array)
     const patternThreats = this.scanForDangerousPatterns(textContent, filename)
-    threats.push(...patternThreats)
-
+    if (patternThreats.length > 0) {
+      threats.push(...patternThreats)
+      securityWarnings.push('File contains potentially dangerous script content')
+    }
+  
     // 4. Metadata extraction and stripping
-    const { cleanedBuffer, metadataStripped, dimensions, duration } = 
+    const { cleanedBuffer, metadataStripped, dimensions, duration } =
       await this.stripSensitiveMetadata(buffer, detectedType)
-
+  
     // 5. File signature generation
     const fileSignature = await this.generateFileSignature(cleanedBuffer)
-
+  
     const isValid = threats.filter(t => t.severity === 'CRITICAL').length === 0
-
+  
+    if (!isValid) {
+      securityWarnings.push('Content validation failed - file may be malicious')
+    }
+  
     debugLogger.info('[MEDIA_SECURITY]', 'File validation completed', {
       filename,
       isValid,
@@ -102,7 +141,7 @@ export class MediaSecurityValidator {
       metadataStripped,
       sizeDifference: buffer.byteLength - cleanedBuffer.byteLength
     })
-
+  
     return {
       isValid,
       detectedMimeType: detectedType,
@@ -113,14 +152,35 @@ export class MediaSecurityValidator {
       fileSignature,
       threats,
       warnings,
+      securityWarnings,
       cleanedBuffer,
       metadataStripped,
       originalSize: buffer.byteLength,
-      cleanedSize: cleanedBuffer.byteLength
+      cleanedSize: cleanedBuffer.byteLength,
+      validationTime: Date.now() - start
     }
   }
 
-  private detectActualFileType(uint8Array: Uint8Array): string {
+  private detectActualFileType(uint8Array: Uint8Array, filename?: string): string {
+    // Special handling for RIFF-based formats (WEBP/WAV)
+    if (uint8Array.length >= 4 &&
+        uint8Array[0] === 0x52 && // 'R'
+        uint8Array[1] === 0x49 && // 'I'
+        uint8Array[2] === 0x46 && // 'F'
+        uint8Array[3] === 0x46) { // 'F'
+      if (uint8Array.length >= 12) {
+        const tag = String.fromCharCode(uint8Array[8], uint8Array[9], uint8Array[10], uint8Array[11])
+        if (tag === 'WAVE') return 'audio/wav'
+        if (tag === 'WEBP') return 'image/webp'
+      }
+      // Fall back to extension if RIFF header is present
+      if (filename) {
+        const lower = filename.toLowerCase()
+        if (lower.endsWith('.wav')) return 'audio/wav'
+        if (lower.endsWith('.webp')) return 'image/webp'
+      }
+    }
+  
     for (const [mimeType, signature] of Object.entries(MediaSecurityValidator.MAGIC_NUMBERS)) {
       if (this.matchesSignature(uint8Array, signature)) {
         return mimeType

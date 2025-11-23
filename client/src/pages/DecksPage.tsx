@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDeckStore } from '../stores/deckStore'
+import { useAuthStore } from '../stores/authStore'
 import { Deck, DeckSettings } from '../../../shared/types'
 import CardManager from '../components/deck/CardManager'
 import ProgressBar from '../components/ui/ProgressBar'
+import { createNewCard } from '../utils/cardDefaults'
 
 
 const DecksPage = () => {
   // Main DecksPage component
   const navigate = useNavigate()
   const {
-    decks,
+    getUserDecks,
     isLoading,
     error,
     importProgress,
@@ -23,6 +25,8 @@ const DecksPage = () => {
     clearError,
     getCards,
     resetImportProgress,
+    hydrateFromIndexedDB,
+    hydrated,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     addCard
   } = useDeckStore()
@@ -92,33 +96,44 @@ const DecksPage = () => {
 
   const hasLoadedExampleDecks = useRef(false)
 
+  // First, hydrate from IndexedDB (decks + cards are stored there; cards are NOT persisted in localStorage)
   useEffect(() => {
-    // Load example decks if no decks exist and we haven't already loaded them
-    // Add a small delay to allow Zustand to hydrate from localStorage first
+    if (!hydrated) {
+      void hydrateFromIndexedDB()
+    }
+  }, [hydrated, hydrateFromIndexedDB])
+
+  const userDecks = getUserDecks()
+
+  useEffect(() => {
+    // Only load example decks after hydration is complete and we truly have no decks
     const timer = setTimeout(() => {
-      if (decks.length === 0 && !hasLoadedExampleDecks.current) {
+      if (hydrated && userDecks.length === 0 && !hasLoadedExampleDecks.current) {
         hasLoadedExampleDecks.current = true
         loadExampleDecks()
       }
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [decks.length, loadExampleDecks])
+  }, [hydrated, userDecks, loadExampleDecks])
 
-  const filteredDecks = decks.filter(deck => {
+  const filteredDecks = userDecks.filter(deck => {
     const matchesSearch = deck.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         deck.description.toLowerCase().includes(searchTerm.toLowerCase())
+                          deck.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === 'all' || deck.category === selectedCategory
     return matchesSearch && matchesCategory
   })
 
-  const categories = ['all', ...Array.from(new Set(decks.map(deck => deck.category).filter(Boolean)))]
+  const categories = ['all', ...Array.from(new Set(userDecks.map(deck => deck.category).filter(Boolean)))]
 
   const handleCreateDeck = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const { user } = useAuthStore.getState()
+      const userId = user?.id || 'local-user'
+
       await createDeck({
-        userId: 'current-user',
+        userId,
         title: newDeckTitle,
         description: newDeckDescription,
         cardCount: 0,
@@ -202,8 +217,11 @@ const DecksPage = () => {
     if (!selectedMap) return
 
     try {
+      const { user } = useAuthStore.getState()
+      const userId = user?.id || 'local-user'
+
       const deck = await createDeck({
-        userId: 'current-user',
+        userId,
         title: selectedMap.name,
         description: selectedMap.description,
         cardCount: selectedMap.regions.length,
@@ -221,16 +239,15 @@ const DecksPage = () => {
 
       // Create cards for each region
       for (const region of selectedMap.regions) {
-        await addCard({
-          deckId: deck.id,
-          front: `What is this region? [Map: ${selectedMap.id}]`,
-          back: region,
-          reviewCount: 0,
-          easeFactor: 2.5,
-          interval: 0,
-          nextReview: new Date(),
-          lastReviewed: new Date()
-        })
+        await addCard(
+          deck.id,
+          createNewCard(
+            `What is this region? [Map: ${selectedMap.id}]`,
+            region,
+            { type: 'basic' as const },
+            []
+          )
+        )
       }
 
       setShowMapModal(false)

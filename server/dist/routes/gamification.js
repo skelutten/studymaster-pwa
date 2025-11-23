@@ -35,32 +35,67 @@ router.get('/achievements/:userId', async (req, res) => {
     });
 });
 router.get('/leaderboard', async (req, res) => {
-    const leaderboard = [
-        {
-            rank: 1,
-            username: 'StudyMaster',
-            xp: 5420,
-            level: 12,
-            streak: 45
-        },
-        {
-            rank: 2,
-            username: 'FlashcardPro',
-            xp: 4890,
-            level: 11,
-            streak: 32
-        },
-        {
-            rank: 3,
-            username: 'MemoryChamp',
-            xp: 4250,
-            level: 10,
-            streak: 28
-        }
-    ];
+    const leaderboardData = {
+        global: [
+            {
+                userId: 'user1',
+                username: 'StudyMaster',
+                avatar: undefined,
+                score: 5420,
+                rank: 1,
+                change: 0
+            },
+            {
+                userId: 'user2',
+                username: 'FlashcardPro',
+                avatar: undefined,
+                score: 4890,
+                rank: 2,
+                change: 1
+            },
+            {
+                userId: 'user3',
+                username: 'MemoryChamp',
+                avatar: undefined,
+                score: 4250,
+                rank: 3,
+                change: -1
+            }
+        ],
+        friends: [
+            {
+                userId: 'friend1',
+                username: 'StudyBuddy',
+                avatar: undefined,
+                score: 3200,
+                rank: 1,
+                change: 0
+            }
+        ],
+        weekly: [
+            {
+                userId: 'user1',
+                username: 'StudyMaster',
+                avatar: undefined,
+                score: 890,
+                rank: 1,
+                change: 2
+            }
+        ],
+        monthly: [
+            {
+                userId: 'user1',
+                username: 'StudyMaster',
+                avatar: undefined,
+                score: 3200,
+                rank: 1,
+                change: 0
+            }
+        ]
+    };
     res.json({
         success: true,
-        data: leaderboard
+        data: leaderboardData
     });
 });
 router.post('/xp', async (req, res) => {

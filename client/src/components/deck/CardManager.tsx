@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useDeckStore } from '../../stores/deckStore'
 import { Card } from '../../../../shared/types'
 import { createNewCard } from '../../utils/cardDefaults'
+import MediaHtmlRenderer from '../MediaHtmlRenderer'
 
 interface CardManagerProps {
   deckId: string
@@ -221,14 +222,22 @@ const CardManager = ({ deckId, onClose }: CardManagerProps) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Front</div>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-600 rounded border min-h-[60px] text-gray-900 dark:text-white">
-                        {card.frontContent}
+                      <div className="p-3 bg-gray-50 dark:bg-gray-600 rounded border min-h-[60px]">
+                        <MediaHtmlRenderer
+                          html={card.frontContent}
+                          deckId={deckId}
+                          className="text-gray-900 dark:text-white"
+                        />
                       </div>
                     </div>
                     <div>
                       <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Back</div>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-600 rounded border min-h-[60px] text-gray-900 dark:text-white">
-                        {card.backContent}
+                      <div className="p-3 bg-gray-50 dark:bg-gray-600 rounded border min-h-[60px]">
+                        <MediaHtmlRenderer
+                          html={card.backContent}
+                          deckId={deckId}
+                          className="text-gray-900 dark:text-white"
+                        />
                       </div>
                     </div>
                   </div>

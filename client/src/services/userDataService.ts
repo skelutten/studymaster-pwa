@@ -1,7 +1,6 @@
 import type {
   User
 } from '@shared/types';
-import { pb } from '../lib/pocketbase';
 import { debugLogger } from '../utils/debugLogger';
 
 // Extended User interface for authentication context
@@ -223,64 +222,29 @@ export class UserDataService {
       return DEMO_USER_STATS;
     }
 
-    // Primary: Try PocketBase
+    // Primary: Try REST API
     try {
-      debugLogger.log('[USER_DATA_SERVICE]', 'Attempting to fetch user stats from PocketBase');
-      
-      const userRecord = await pb.collection('users').getOne(user.id, {
-        fields: 'level,total_xp,coins,gems,last_active,created,preferences'
-      });
-
-      debugLogger.log('[USER_DATA_SERVICE]', 'PocketBase user stats fetched successfully');
-
-      // Convert PocketBase record to UserStats format
-      const stats: UserStats = {
-        totalXP: userRecord.total_xp || 0,
-        level: userRecord.level || 1,
-        currentLevelXP: (userRecord.total_xp || 0) % 200, // Assuming 200 XP per level
-        nextLevelXP: 200,
-        cardsStudied: 0, // Will need to calculate from study sessions
-        studyTime: 0, // Will need to calculate from study sessions
-        accuracy: 85, // Default value, calculate from actual data later
-        currentStreak: 0, // Calculate from study sessions
-        longestStreak: 0, // Calculate from study sessions
-        coins: userRecord.coins || 100,
-        gems: userRecord.gems || 10,
-        lastStudyDate: userRecord.last_active || new Date().toISOString(),
-        joinDate: userRecord.created || new Date().toISOString()
-      };
-
-      return stats;
-    } catch (pocketbaseError) {
-      debugLogger.warn('[USER_DATA_SERVICE]', 'PocketBase fetch failed, trying REST API fallback', {
-        error: pocketbaseError
-      });
-
-      // Fallback: Try REST API
-      try {
-        const response = await fetch(`${this.baseUrl}/users/${user.id}/stats`, {
-          headers: {
-            'Authorization': `Bearer ${user.token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch user stats from REST API');
+      const response = await fetch(`${this.baseUrl}/users/${user.id}/stats`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json'
         }
+      });
 
-        const data = await response.json();
-        debugLogger.log('[USER_DATA_SERVICE]', 'REST API user stats fetched successfully');
-        return data;
-      } catch (apiError) {
-        debugLogger.warn('[USER_DATA_SERVICE]', 'Both PocketBase and REST API failed, using mock data', {
-          pocketbaseError,
-          apiError
-        });
-        
-        // Final fallback: Return personalized mock data
-        return this.generatePersonalizedMockStats(user);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user stats from REST API');
       }
+
+      const data = await response.json();
+      debugLogger.log('[USER_DATA_SERVICE]', 'REST API user stats fetched successfully');
+      return data;
+    } catch (apiError) {
+      debugLogger.warn('[USER_DATA_SERVICE]', 'REST API failed, using mock data', {
+        apiError
+      });
+      
+      // Final fallback: Return personalized mock data
+      return this.generatePersonalizedMockStats(user);
     }
   }
 
@@ -366,7 +330,7 @@ export class UserDataService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/leaderboard`, {
+      const response = await fetch(`${this.baseUrl}/gamification/leaderboard`, {
         headers: {
           'Authorization': `Bearer ${user.token}`,
           'Content-Type': 'application/json'

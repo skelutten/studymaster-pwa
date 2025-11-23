@@ -179,11 +179,21 @@ describe('AnkiImportOrchestrator', () => {
     })
 
     test('should handle file validation errors', async () => {
-      const largeFile = new File(['x'.repeat(100 * 1024 * 1024)], 'large.apkg') // 100MB
+      const mockFile = {
+        name: 'large.apkg',
+        size: 100 * 1024 * 1024, // 100MB, exceeding maxFileSize
+        type: 'application/zip',
+        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(0)), // Dummy arrayBuffer
+      } as unknown as File; // Cast to File
+
+      // Temporarily mock the global File constructor for this test
+      const FileSpy = vi.spyOn(global, 'File').mockImplementation(() => mockFile);
       
-      await expect(orchestrator.importAnkiDeck(largeFile, mockConfig))
+      await expect(orchestrator.importAnkiDeck(mockFile, mockConfig))
         .rejects.toThrow(/too large/i)
-    })
+
+      FileSpy.mockRestore(); // Restore original File constructor
+    });
 
     test('should validate file extension', async () => {
       const invalidFile = new File(['test'], 'test.txt')

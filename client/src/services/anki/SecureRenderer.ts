@@ -46,7 +46,7 @@ export class SecureRenderer {
         const originalValue = data.attrValue
         
         // Remove dangerous CSS patterns
-        let cleanValue = data.attrValue
+        const cleanValue = data.attrValue
           .replace(/javascript\s*:/gi, '')
           .replace(/expression\s*\([^)]*\)/gi, '')
           .replace(/behavior\s*:\s*url\s*\([^)]*\)/gi, '')

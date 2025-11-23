@@ -81,6 +81,7 @@ export class WorkerManager {
         onProgress,
         onComplete: resolve,
         onError: (error) => {
+          console.log(`WorkerManager: Task ${task.id} onError callback triggered with error:`, error.message);
           onError?.(error)
           reject(new Error(error.message))
         }
@@ -340,7 +341,10 @@ export class WorkerManager {
    */
   private handleTaskError(taskId: string, error: ImportError): void {
     const task = this.activeImports.get(taskId)
-    if (!task) return
+    if (!task) {
+      console.warn(`WorkerManager: handleTaskError called for unknown task ${taskId}`)
+      return
+    }
 
     console.error(`WorkerManager: Task ${taskId} failed:`, error.message)
 
@@ -402,7 +406,10 @@ export class WorkerManager {
    */
   private handleTaskCancellation(taskId: string): void {
     const task = this.activeImports.get(taskId)
-    if (!task) return
+    if (!task) {
+      console.warn(`WorkerManager: handleTaskCancellation called for unknown task ${taskId}`)
+      return
+    }
 
     console.log(`WorkerManager: Task ${taskId} was cancelled`)
 

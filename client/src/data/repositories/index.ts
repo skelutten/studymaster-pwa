@@ -7,7 +7,7 @@
  * Minimal methods provided to start Phase 0. Extend incrementally as flows are refactored.
  */
 
-import db, { ensureDBOpen, type DeckRow, type CardRow, type ReviewRow, type MediaRow, type AchievementRow, type LeaderboardCacheRow } from '../db';
+import db, { ensureDBOpen, type DeckRow, type CardRow, type ReviewRow, type MediaRow, type AchievementRow, type LeaderboardCacheRow, type SyncQueueRow, type MediaAnalyticsRow, type UserOnlineLinkRow } from '../db';
 
 /* =========================
  * Shared helpers / DTO types
@@ -116,9 +116,71 @@ export interface LeaderboardCacheRepository {
   get(scope: string, { ignoreTTL }?: { ignoreTTL?: boolean }): Promise<LeaderboardCacheRow | null>;
 }
 
+export interface SyncQueueRepository {
+  enqueue(op: Omit<SyncQueueRow, 'queueId' | 'createdAt' | 'attemptCount'> & { queueId?: string }): Promise<SyncQueueRow>;
+  list(limit?: number): Promise<SyncQueueRow[]>;
+  markAttempt(queueId: string, lastError?: string): Promise<void>;
+  remove(queueId: string): Promise<void>;
+}
+
+/* Media analytics (client-only) */
+export interface MediaAnalyticsRepository {
+  increment(deckId: string, mediaId: string, delta?: number, lastAccessedMs?: number): Promise<void>;
+  get(deckId: string, mediaId: string): Promise<MediaAnalyticsRow | null>;
+  top(deckId: string, limit?: number): Promise<MediaAnalyticsRow[]>;
+}
+
+/* User online links (optional server link to local account) */
+export interface UserOnlineLinkRepository {
+  upsert(input: Omit<UserOnlineLinkRow, 'linkKey' | 'lastLinkedAt'> & { lastLinkedAt?: number }): Promise<UserOnlineLinkRow>;
+  get(linkKey: string): Promise<UserOnlineLinkRow | null>;
+  listByDevice(deviceUserId: string): Promise<UserOnlineLinkRow[]>;
+  remove(linkKey: string): Promise<void>;
+}
+
 /* =========================
  * IndexedDB implementations
  * ========================= */
+
+/* =========================
+ * UserOnlineLinks implementations (local account optional server link)
+ * ========================= */
+async function upsertUserOnlineLinkIndexedDB(input: Omit<UserOnlineLinkRow, 'linkKey' | 'lastLinkedAt'> & { lastLinkedAt?: number }): Promise<UserOnlineLinkRow> {
+ await ensureDBOpen();
+ const linkKey = `${input.deviceUserId}:${input.provider}`;
+ const row: UserOnlineLinkRow = {
+   linkKey,
+   deviceUserId: input.deviceUserId,
+   provider: input.provider,
+   serverUserId: input.serverUserId,
+   accessToken: input.accessToken,
+   refreshToken: input.refreshToken,
+   scopes: input.scopes,
+   lastLinkedAt: input.lastLinkedAt ?? Date.now(),
+   meta: input.meta,
+ };
+ await db.userOnlineLinks.put(row);
+ return row;
+}
+
+async function getUserOnlineLinkByKeyIndexedDB(linkKey: string): Promise<UserOnlineLinkRow | null> {
+ await ensureDBOpen();
+ return (await db.userOnlineLinks.get(linkKey)) ?? null;
+}
+
+async function listUserOnlineLinksByDeviceIndexedDB(deviceUserId: string): Promise<UserOnlineLinkRow[]> {
+ await ensureDBOpen();
+ return db.userOnlineLinks.where('deviceUserId').equals(deviceUserId).toArray();
+}
+
+async function removeUserOnlineLinkIndexedDB(linkKey: string): Promise<void> {
+ await ensureDBOpen();
+ await db.userOnlineLinks.delete(linkKey);
+}
+
+/* =========================
+* Core repositories
+* ========================= */
 
 async function createDeckIndexedDB(deck: NewDeck): Promise<DeckRow> {
   await ensureDBOpen();
@@ -298,6 +360,45 @@ async function setLeaderboardCacheIndexedDB(input: LeaderboardCacheWrite): Promi
   return row;
 }
 
+/* =========================
+ * SyncQueue (Phase 2)
+ * ========================= */
+async function enqueueSyncIndexedDB(input: Omit<SyncQueueRow, 'queueId' | 'createdAt' | 'attemptCount'> & { queueId?: string }): Promise<SyncQueueRow> {
+  await ensureDBOpen();
+  const row: SyncQueueRow = {
+    queueId: input.queueId ?? `q_${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
+    opType: input.opType,
+    payload: input.payload,
+    createdAt: nowTs(),
+    attemptCount: 0,
+    lastError: undefined,
+  };
+  await db.syncQueue.put(row);
+  return row;
+}
+
+async function listSyncQueueIndexedDB(limit = 100): Promise<SyncQueueRow[]> {
+  await ensureDBOpen();
+  const rows = await db.syncQueue.orderBy('createdAt').toArray();
+  return rows.slice(0, limit);
+}
+
+async function markAttemptSyncIndexedDB(queueId: string, lastError?: string): Promise<void> {
+  await ensureDBOpen();
+  const row = await db.syncQueue.get(queueId);
+  if (!row) return;
+  await db.syncQueue.put({
+    ...row,
+    attemptCount: (row.attemptCount ?? 0) + 1,
+    lastError,
+  });
+}
+
+async function removeSyncIndexedDB(queueId: string): Promise<void> {
+  await ensureDBOpen();
+  await db.syncQueue.delete(queueId);
+}
+
 async function getLeaderboardCacheIndexedDB(scope: string, opts?: { ignoreTTL?: boolean }): Promise<LeaderboardCacheRow | null> {
   await ensureDBOpen();
   const row = await db.leaderboardCache.get(scope);
@@ -306,6 +407,54 @@ async function getLeaderboardCacheIndexedDB(scope: string, opts?: { ignoreTTL?: 
   const age = nowTs() - row.fetchedAt;
   if (age > row.ttlMs) return null;
   return row;
+}
+
+/* =========================
+ * MediaAnalytics implementations
+ * ========================= */
+async function incrementMediaAnalyticsIndexedDB(deckId: string, mediaId: string, delta: number = 1, lastAccessedMs?: number): Promise<void> {
+  await ensureDBOpen();
+  // Find existing row by deckId and mediaId
+  const existing = await db.mediaAnalytics
+    .where('deckId')
+    .equals(deckId)
+    .and(r => r.mediaId === mediaId)
+    .first();
+
+  if (existing) {
+    await db.mediaAnalytics.put({
+      ...existing,
+      accessCount: (existing.accessCount ?? 0) + delta,
+      lastAccessed: lastAccessedMs ?? Date.now(),
+    });
+  } else {
+    const row: MediaAnalyticsRow = {
+      deckId,
+      mediaId,
+      accessCount: delta,
+      lastAccessed: lastAccessedMs ?? Date.now(),
+    };
+    await db.mediaAnalytics.add(row);
+  }
+}
+
+async function getMediaAnalyticsIndexedDB(deckId: string, mediaId: string): Promise<MediaAnalyticsRow | null> {
+  await ensureDBOpen();
+  const row = await db.mediaAnalytics
+    .where('deckId')
+    .equals(deckId)
+    .and(r => r.mediaId === mediaId)
+    .first();
+  return row ?? null;
+}
+
+async function topMediaAnalyticsIndexedDB(deckId: string, limit: number = 10): Promise<MediaAnalyticsRow[]> {
+  await ensureDBOpen();
+  const rows = await db.mediaAnalytics
+    .where('deckId')
+    .equals(deckId)
+    .toArray();
+  return rows.sort((a, b) => (b.accessCount ?? 0) - (a.accessCount ?? 0)).slice(0, limit);
 }
 
 /* =========================
@@ -319,6 +468,9 @@ export type Repositories = {
   media: MediaRepository;
   achievements: AchievementRepository;
   leaderboardCache: LeaderboardCacheRepository;
+  syncQueue: SyncQueueRepository;
+  mediaAnalytics: MediaAnalyticsRepository;
+  userOnlineLinks: UserOnlineLinkRepository;
 };
 
 export function createIndexedDBRepositories(): Repositories {
@@ -354,6 +506,23 @@ export function createIndexedDBRepositories(): Repositories {
     leaderboardCache: {
       set: setLeaderboardCacheIndexedDB,
       get: getLeaderboardCacheIndexedDB,
+    },
+    syncQueue: {
+      enqueue: enqueueSyncIndexedDB,
+      list: listSyncQueueIndexedDB,
+      markAttempt: markAttemptSyncIndexedDB,
+      remove: removeSyncIndexedDB,
+    },
+    mediaAnalytics: {
+      increment: incrementMediaAnalyticsIndexedDB,
+      get: getMediaAnalyticsIndexedDB,
+      top: topMediaAnalyticsIndexedDB,
+    },
+    userOnlineLinks: {
+      upsert: upsertUserOnlineLinkIndexedDB,
+      get: getUserOnlineLinkByKeyIndexedDB,
+      listByDevice: listUserOnlineLinksByDeviceIndexedDB,
+      remove: removeUserOnlineLinkIndexedDB,
     },
   };
 }

@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-e0cae909'], (function (workbox) { 'use strict';
+define(['./workbox-da8389ba'], (function (workbox) { 'use strict';
 
   self.skipWaiting();
   workbox.clientsClaim();
@@ -82,7 +82,7 @@ define(['./workbox-e0cae909'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/index.html",
-    "revision": "0.o51vmuj9ddk"
+    "revision": "0.idmcff87oq4"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
@@ -118,6 +118,18 @@ define(['./workbox-e0cae909'], (function (workbox) { 'use strict';
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 10,
       maxAgeSeconds: 31536000
+    })]
+  }), 'GET');
+  workbox.registerRoute(/\/api\/leaderboard\/submit/i, new workbox.NetworkOnly({
+    plugins: [new workbox.BackgroundSyncPlugin("leaderboard-queue", {
+      maxRetentionTime: 60
+    })]
+  }), 'POST');
+  workbox.registerRoute(/\/api\/leaderboard\/?.*/i, new workbox.NetworkFirst({
+    "cacheName": "leaderboard-api",
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 30,
+      maxAgeSeconds: 600
     })]
   }), 'GET');
   workbox.registerRoute(/\/api\/.*/i, new workbox.NetworkFirst({

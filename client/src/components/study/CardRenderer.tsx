@@ -1,14 +1,16 @@
 import React from 'react'
 import { Card, SvgMapCardOptions } from '../../../../shared/types'
 import { SvgMapCard } from '../SvgMapCard'
+import MediaHtmlRenderer from '../MediaHtmlRenderer'
 
 interface CardRendererProps {
   card: Card
   showAnswer: boolean
+  deckId: string
   onAnswerSubmit?: (answer: string) => void
 }
 
-const CardRenderer: React.FC<CardRendererProps> = ({ card, showAnswer, onAnswerSubmit }) => {
+const CardRenderer: React.FC<CardRendererProps> = ({ card, showAnswer, deckId, onAnswerSubmit }) => {
   if (!card) {
     return null // or a loading indicator
   }
@@ -36,8 +38,12 @@ const CardRenderer: React.FC<CardRendererProps> = ({ card, showAnswer, onAnswerS
         <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
           {showAnswer ? 'Answer' : 'Question'}
         </h2>
-        <div className="text-2xl font-medium text-gray-900 dark:text-white">
-          {showAnswer ? card.backContent : card.frontContent}
+        <div className="text-2xl font-medium">
+          <MediaHtmlRenderer
+            html={showAnswer ? card.backContent : card.frontContent}
+            deckId={deckId}
+            className="text-gray-900 dark:text-white"
+          />
         </div>
       </div>
     </div>

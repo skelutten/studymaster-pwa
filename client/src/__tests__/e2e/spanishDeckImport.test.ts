@@ -371,7 +371,7 @@ describe('Spanish Top 5000 Vocabulary Deck - End-to-End Media Import', () => {
       }
 
       // All files should validate successfully
-      validationResults.forEach(({ filename, result }) => {
+      validationResults.forEach(({ result }) => {
         expect(result.isValid).toBe(true)
         expect(result.detectedMimeType).toMatch(/^(audio|image)\//)
       })

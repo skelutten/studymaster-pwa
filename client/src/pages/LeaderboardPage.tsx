@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../stores/authStore'
-import { userDataService, type AuthenticatedUser, type LeaderboardData, type LeaderboardEntry } from '../services/userDataService'
+import { type AuthenticatedUser, type LeaderboardData, type LeaderboardEntry } from '../services/userDataService'
+import { getLeaderboardService } from '../services/leaderboard'
+import { repos } from '../data'
+import { isOnlineLeaderboardEnabled } from '../config/featureFlags'
 
 type LeaderboardType = 'global' | 'friends' | 'weekly' | 'monthly'
 
@@ -11,26 +14,72 @@ const LeaderboardPage = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData | null>(null)
   const [dataLoading, setDataLoading] = useState(false)
   const [dataError, setDataError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
+  const [refreshTick, setRefreshTick] = useState(0)
+  const [queuedCount, setQueuedCount] = useState(0)
+  const [cacheInfo, setCacheInfo] = useState<{ ageSec: number | null; ttlSec: number | null; expired: boolean | null } | null>(null)
   
   const [selectedType, setSelectedType] = useState<LeaderboardType>('global')
+
+  // Online feature gating
+  const [onlineEnabled, setOnlineEnabled] = useState<boolean>(isOnlineLeaderboardEnabled())
+  const [linked, setLinked] = useState<boolean | null>(null)
+
+  // Resolve linked status and track feature flag changes
+  useEffect(() => {
+    let cancelled = false
+    const { isOnlineLinked } = useAuthStore.getState()
+
+    const run = async () => {
+      try {
+        const result = await isOnlineLinked('studymaster')
+        if (!cancelled) setLinked(result)
+      } catch {
+        if (!cancelled) setLinked(false)
+      }
+    }
+
+    // Initialize from current state
+    setOnlineEnabled(isOnlineLeaderboardEnabled())
+    if (useAuthStore.getState().user) {
+      void run()
+    } else {
+      setLinked(false)
+    }
+
+    // Listen to storage changes for the online flag (in case user toggles it from Profile page)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'sm.onlineLeaderboardEnabled') {
+        setOnlineEnabled(e.newValue === 'true')
+      }
+    }
+    window.addEventListener('storage', onStorage)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [])
   
-  // Load dynamic leaderboard data when user is available
+  // Load dynamic leaderboard data when user is available and online is enabled + linked
   useEffect(() => {
     const loadLeaderboardData = async () => {
-      if (!user) return
-      
+      if (!user || !onlineEnabled || !linked) return
+
       setDataLoading(true)
       setDataError(null)
-      
+
       try {
         const authenticatedUser: AuthenticatedUser = {
           ...user,
           token: (user as AuthenticatedUser).token,
           tokenType: (user as AuthenticatedUser).tokenType
         }
-        
-        const data = await userDataService.getLeaderboardData(authenticatedUser)
+
+        const provider = getLeaderboardService()
+        const data = await provider.fetchAll(authenticatedUser)
         setLeaderboardData(data)
+        setLastUpdated(Date.now())
       } catch (error) {
         console.error('Failed to load leaderboard data:', error)
         setDataError('Failed to load leaderboard data')
@@ -38,9 +87,63 @@ const LeaderboardPage = () => {
         setDataLoading(false)
       }
     }
-    
-    loadLeaderboardData()
-  }, [user])
+
+    void loadLeaderboardData()
+  }, [user, refreshTick, onlineEnabled, linked])
+
+  // Compute cache TTL/age info for the selected scope
+  useEffect(() => {
+    let mounted = true
+    const toScopeKey = (s: LeaderboardType) => (s === 'friends' ? 'friends:global' : `${s}:global`)
+    const run = async () => {
+      try {
+        const row = await repos.leaderboardCache.get(toScopeKey(selectedType), { ignoreTTL: true })
+        if (!mounted) return
+        if (!row) {
+          setCacheInfo(null)
+          return
+        }
+        const ageMs = Date.now() - row.fetchedAt
+        const ageSec = Math.max(0, Math.floor(ageMs / 1000))
+        const ttlSec = Math.max(0, Math.floor((row.ttlMs ?? 0) / 1000))
+        const expired = ttlSec > 0 ? ageSec > ttlSec : false
+        setCacheInfo({ ageSec, ttlSec, expired })
+      } catch {
+        if (!mounted) return
+        setCacheInfo(null)
+      }
+    }
+    void run()
+    return () => { mounted = false }
+  }, [selectedType, refreshTick])
+  
+  // Poll queued leaderboard submissions to inform user about pending sync
+  useEffect(() => {
+    let mounted = true
+    let timer: number | undefined
+
+    const updateQueued = async () => {
+      try {
+        const rows = await repos.syncQueue.list(200)
+        const count = rows.filter(r => r.opType === 'leaderboard:submit').length
+        if (mounted) setQueuedCount(count)
+      } catch {
+        // ignore
+      }
+    }
+
+    void updateQueued()
+    timer = window.setInterval(() => void updateQueued(), 10000)
+
+    const onOnline = () => void updateQueued()
+    window.addEventListener('online', onOnline)
+
+    return () => {
+      mounted = false
+      if (timer) window.clearInterval(timer)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [])
   
   const leaderboardTypes: { value: LeaderboardType; label: string; icon: string; description: string }[] = [
     { value: 'global', label: 'Global Rankings', icon: '🌍', description: 'Compete with all users worldwide' },
@@ -91,6 +194,52 @@ const LeaderboardPage = () => {
   }
   
   const currentUserEntry = currentLeaderboard.find(entry => entry.userId === user?.id)
+
+  // Gate UI until online is enabled and account is linked
+  if (onlineEnabled && linked === null) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="text-center text-gray-600 dark:text-gray-400">Checking online account link…</div>
+      </div>
+    )
+  }
+  if (!onlineEnabled || linked === false) {
+    return (
+      <div className="max-w-4xl mx-auto p-6 space-y-8">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            🏆 Leaderboard
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Compete with other learners and climb the ranks!
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+            Online leaderboards are disabled
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Enable online features and link your account to participate in global rankings.
+          </p>
+          <div className="flex items-center justify-between">
+            <a
+              href="/profile"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Go to Account Settings
+            </a>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Status: {onlineEnabled ? 'Online enabled' : 'Online disabled'} • {linked ? 'Linked' : 'Not linked'}
+            </span>
+          </div>
+          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            Note: Study data and media are stored locally. Nothing is uploaded unless you enable online features.
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
@@ -175,11 +324,36 @@ const LeaderboardPage = () => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {leaderboardTypes.find(t => t.value === selectedType)?.label}
             </h3>
-            {!dataLoading && leaderboardData && (
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Updated recently
-              </div>
-            )}
+            <div className="flex items-center space-x-3">
+              {!dataLoading && leaderboardData && (
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {lastUpdated ? `Updated ${Math.max(1, Math.floor((Date.now() - lastUpdated) / 1000))}s ago` : '—'}
+                </div>
+              )}
+              {cacheInfo && (
+                <div
+                  title="Cache age and TTL"
+                  className={`text-xs px-2 py-1 rounded-full border ${
+                    cacheInfo.expired
+                      ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 border-red-300 dark:border-red-800'
+                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800'
+                  }`}
+                >
+                  {cacheInfo.ageSec ?? '—'}s / TTL {cacheInfo.ttlSec ?? '—'}s {cacheInfo.expired ? '(expired)' : ''}
+                </div>
+              )}
+              {queuedCount > 0 && (
+                <div className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
+                  {queuedCount} queued
+                </div>
+              )}
+              <button
+                onClick={() => setRefreshTick(t => t + 1)}
+                className="text-sm px-3 py-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
         </div>
         

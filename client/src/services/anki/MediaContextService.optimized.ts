@@ -3,7 +3,7 @@
  * Handles media URL resolution with minimal React re-renders
  */
 
-import { pb } from '../../lib/pocketbase'
+/** Client-only build: PocketBase dependency removed */
 import { debugLogger } from '../../utils/debugLogger'
 import PerformanceMonitor from '../../utils/performanceMonitoring'
 
@@ -37,7 +37,8 @@ export class OptimizedMediaContextService {
   private urlMappings = new Map<string, Map<string, MediaUrlMapping>>()
   private cache = new Map<string, string>() // filename -> resolved HTML cache
   private config: MediaContextConfig
-  private performanceMonitor = PerformanceMonitor.getInstance()
+  // In client-only build, PerformanceMonitor is a default-exported singleton-like object
+  private performanceMonitor = PerformanceMonitor
   
   // Batch processing queue to prevent overwhelming the system
   private processingQueue = new Map<string, Promise<string>>()
@@ -179,20 +180,14 @@ export class OptimizedMediaContextService {
     
     const deckMappings = this.urlMappings.get(deckId)
     if (!deckMappings) {
-      debugLogger.warn('[MEDIA_CONTEXT_OPT]', 'No media mappings found for deck', { deckId })
+      // Normal for text-only decks - return original HTML
       return htmlContent
     }
 
     let resolvedHtml = htmlContent
 
-    // Process different media types concurrently but with limits
-    const processingTasks = [
-      this.replaceImageReferences(resolvedHtml, deckMappings),
-      this.replaceAudioReferences(resolvedHtml, deckMappings),
-      this.replaceVideoReferences(resolvedHtml, deckMappings)
-    ]
-
-    const [imageProcessed, audioProcessed, videoProcessed] = await Promise.all(processingTasks)
+    // Process images asynchronously; audio/video handled synchronously below
+    const imageProcessed = await this.replaceImageReferences(resolvedHtml, deckMappings)
 
     // Apply changes sequentially to avoid conflicts
     resolvedHtml = imageProcessed
@@ -322,19 +317,17 @@ export class OptimizedMediaContextService {
    * Async database update that doesn't block UI
    */
   private updateMediaAccessStatsAsync(mapping: MediaUrlMapping): void {
-    // Use setTimeout to avoid blocking current execution
-    setTimeout(async () => {
+    // Client-only mode: persist lightweight analytics in a later phase (IndexedDB).
+    // Non-blocking log for visibility during tests.
+    setTimeout(() => {
       try {
-        await pb.collection('media_files').update(mapping.mediaId, {
-          access_count: mapping.accessCount,
-          last_accessed: mapping.lastAccessed.toISOString()
+        debugLogger.info('[MEDIA_CONTEXT_OPT]', 'Access stats updated (in-memory only)', {
+          mediaId: mapping.mediaId,
+          accessCount: mapping.accessCount,
+          lastAccessed: mapping.lastAccessed.toISOString()
         })
-      } catch (error) {
-        // Non-critical error, just log it
-        debugLogger.warn('[MEDIA_CONTEXT_OPT]', 'Access stats update failed', { 
-          mediaId: mapping.mediaId, 
-          error 
-        })
+      } catch {
+        // ignore
       }
     }, 0)
   }
@@ -448,31 +441,10 @@ export class OptimizedMediaContextService {
   }
 
   private cleanupDeckMediaAsync(deckId: string): void {
-    setTimeout(async () => {
-      try {
-        const mediaFiles = await pb.collection('media_files').getFullList({
-          filter: `deck_id = "${deckId}"`
-        })
-        
-        // Delete in batches to avoid overwhelming database
-        const deletePromises = mediaFiles.map(file => 
-          pb.collection('media_files').delete(file.id).catch(error => 
-            debugLogger.warn('[MEDIA_CONTEXT_OPT]', 'Failed to delete media file', { 
-              fileId: file.id, 
-              error 
-            })
-          )
-        )
-
-        await Promise.allSettled(deletePromises)
-        
-        debugLogger.info('[MEDIA_CONTEXT_OPT]', 'Deck media cleanup completed', { 
-          deckId,
-          filesDeleted: mediaFiles.length
-        })
-      } catch (error) {
-        debugLogger.error('[MEDIA_CONTEXT_OPT]', 'Deck media cleanup failed', { deckId, error })
-      }
+    // Client-only: media blobs are stored in IndexedDB and cleaned up by higher-level storage routines.
+    // Keep async shape for compatibility and log for diagnostics.
+    setTimeout(() => {
+      debugLogger.info('[MEDIA_CONTEXT_OPT]', 'Deck media cleanup skipped (client-only mode)', { deckId })
     }, 0)
   }
 
@@ -526,8 +498,10 @@ export class OptimizedMediaContextService {
   }
 
   // Helper methods
-  private getDirectMediaUrl(mediaFile: any): string {
-    return pb.files.getUrl(mediaFile, mediaFile.media_file)
+  private getDirectMediaUrl(_mediaFile: any): string {
+    // Client-only: object URLs are created asynchronously in the non-optimized service.
+    // The optimized variant does not perform network URL resolution.
+    return ''
   }
 
   private getMediaType(mimeType: string): 'image' | 'audio' | 'video' {
@@ -551,18 +525,6 @@ export class OptimizedMediaContextService {
   }
 
   // Async methods for compatibility
-  private async replaceImageReferences(html: string, mappings: Map<string, MediaUrlMapping>): Promise<string> {
-    return this.replaceImageReferencesSync(html, mappings)
-  }
-
-  private async replaceAudioReferences(html: string, mappings: Map<string, MediaUrlMapping>): Promise<string> {
-    return this.replaceAudioReferencesInHtml(html, mappings)
-  }
-
-  private async replaceVideoReferences(html: string, mappings: Map<string, MediaUrlMapping>): Promise<string> {
-    return this.replaceVideoReferencesInHtml(html, mappings)
-  }
-
   private replaceImageReferencesSync(html: string, mappings: Map<string, MediaUrlMapping>): string {
     const imgPattern = /<img\s+[^>]*src\s*=\s*["']([^"']+)["'][^>]*>/gi
     

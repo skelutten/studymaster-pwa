@@ -3,6 +3,10 @@ import { pb } from '../lib/pocketbase'
 import type { User } from '../types'
 import { debugLogger } from '../utils/debugLogger'
 import { validateForm, validationSchemas, sanitizeInput } from '../utils/validation'
+import { ensureLocalProfile, updateLocalProfile } from '../services/localProfileService'
+import { linkAccount, unlinkAccount, isLinked } from '../services/onlineLinkService'
+import { isRemoteAuthEnabled } from '../config/featureFlags'
+import { useDeckStore } from './deckStore'
 
 interface AuthState {
   user: User | null
@@ -16,6 +20,11 @@ interface AuthState {
   register: (email: string, username: string, password: string) => Promise<void>
   logout: () => void
   updateUser: (updates: Partial<User>) => void
+
+  // Local Account + Online Link (optional)
+  connectOnline: (provider: 'studymaster', link: { serverUserId: string; accessToken: string; refreshToken?: string; scopes?: string[] }) => Promise<void>
+  disconnectOnline: (provider: 'studymaster') => Promise<void>
+  isOnlineLinked: (provider: 'studymaster') => Promise<boolean>
   
   // PocketBase-specific Actions
   signUp: (email: string, password: string, username: string) => Promise<void>
@@ -30,25 +39,31 @@ interface AuthState {
 
 // Helper function to convert PocketBase user to our User type
 const convertPocketbaseUser = async (pocketbaseUser: Record<string, unknown>): Promise<User> => {
-  debugLogger.log('[POCKETBASE_AUTH_STORE]', 'START - convertPocketbaseUser', {
-    userId: pocketbaseUser.id,
-    email: pocketbaseUser.email,
-    username: pocketbaseUser.username
+  const rec = pocketbaseUser as any;
+  debugLogger.log('[POCKETBASE]', 'START - convertPocketbaseUser', {
+    userId: rec?.id,
+    email: rec?.email,
+    username: rec?.username
   });
 
   try {
-    const convertedUser = {
-      id: pocketbaseUser.id,
-      email: pocketbaseUser.email,
-      username: pocketbaseUser.username || pocketbaseUser.email?.split('@')[0] || 'User',
-      level: pocketbaseUser.level || 1,
-      totalXp: pocketbaseUser.total_xp || 0,
-      coins: pocketbaseUser.coins || 100,
-      gems: pocketbaseUser.gems || 10,
-      createdAt: pocketbaseUser.created || new Date().toISOString(),
-      lastActive: pocketbaseUser.last_active || new Date().toISOString(),
-      preferences: pocketbaseUser.preferences || {
-        theme: 'system' as const,
+    const id: string = String(rec?.id ?? '');
+    const email: string = String(rec?.email ?? '');
+    const baseName = email && email.includes('@') ? email.split('@')[0] : 'User';
+    const username: string = String(rec?.username ?? baseName ?? 'User');
+
+    const convertedUser: User = {
+      id,
+      email: email || 'unknown@example.com',
+      username,
+      level: Number(rec?.level ?? 1),
+      totalXp: Number(rec?.total_xp ?? 0),
+      coins: Number(rec?.coins ?? 100),
+      gems: Number(rec?.gems ?? 10),
+      createdAt: String(rec?.created ?? new Date().toISOString()),
+      lastActive: String(rec?.last_active ?? new Date().toISOString()),
+      preferences: rec?.preferences ?? {
+        theme: 'system',
         language: 'en',
         notifications: true,
         soundEffects: true,
@@ -57,28 +72,33 @@ const convertPocketbaseUser = async (pocketbaseUser: Record<string, unknown>): P
       }
     };
 
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - convertPocketbaseUser', convertedUser);
+    debugLogger.log('[POCKETBASE]', 'END - convertPocketbaseUser', convertedUser);
     return convertedUser;
   } catch (error) {
-    debugLogger.error('[POCKETBASE_AUTH_STORE]', 'Error in convertPocketbaseUser', {
+    debugLogger.error('[POCKETBASE]', 'Error in convertPocketbaseUser', {
       error,
       stack: error instanceof Error ? error.stack : undefined,
-      userId: pocketbaseUser.id
+      userId: (rec as any)?.id
     });
     
     // Fallback: create a basic user object
-    const fallbackUser = {
-      id: pocketbaseUser.id,
-      email: pocketbaseUser.email || 'unknown@example.com',
-      username: pocketbaseUser.username || pocketbaseUser.email?.split('@')[0] || 'User',
+    const id: string = String(rec?.id ?? '');
+    const email: string = String(rec?.email ?? 'unknown@example.com');
+    const baseName = email && email.includes('@') ? email.split('@')[0] : 'User';
+    const username: string = String(rec?.username ?? baseName ?? 'User');
+
+    const fallbackUser: User = {
+      id,
+      email,
+      username,
       level: 1,
       totalXp: 0,
       coins: 100,
       gems: 10,
-      createdAt: pocketbaseUser.created || new Date().toISOString(),
+      createdAt: String(rec?.created ?? new Date().toISOString()),
       lastActive: new Date().toISOString(),
       preferences: {
-        theme: 'system' as const,
+        theme: 'system',
         language: 'en',
         notifications: true,
         soundEffects: true,
@@ -87,7 +107,7 @@ const convertPocketbaseUser = async (pocketbaseUser: Record<string, unknown>): P
       }
     };
 
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - convertPocketbaseUser (fallback)', fallbackUser);
+    debugLogger.log('[POCKETBASE]', 'END - convertPocketbaseUser (fallback)', fallbackUser);
     return fallbackUser;
   }
 }
@@ -200,7 +220,7 @@ const performPocketBaseAuth = async (email: string, password: string) => {
   try {
     return await pb.collection('users').authWithPassword(sanitizedEmail, password)
   } catch (emailError) {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Email login failed, trying username');
+    debugLogger.log('[POCKETBASE]', 'Email login failed, trying username');
     return await pb.collection('users').authWithPassword(sanitizedEmail, password)
   }
 }
@@ -210,9 +230,9 @@ const updateUserLastActive = async (userId: string) => {
     await pb.collection('users').update(userId, {
       last_active: new Date().toISOString()
     })
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Updated last active time');
+    debugLogger.log('[POCKETBASE]', 'Updated last active time');
   } catch (updateError) {
-    debugLogger.warn('[POCKETBASE_AUTH_STORE]', 'Could not update last active time', {
+    debugLogger.warn('[POCKETBASE]', 'Could not update last active time', {
       error: updateError
     });
   }
@@ -227,166 +247,81 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isLoading: false,
   error: null,
 
-  signUp: async (email: string, password: string, username: string) => {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'START - signUp', {
-      email,
-      username,
-      passwordLength: password.length
-    });
-
+  signUp: async (email: string, _password: string, username: string) => {
+    // Force local registration (server optional). Never calls PocketBase.
     set({ isLoading: true, error: null })
-    
-    try {
-      validateSignUpInputs(email, password, username)
-      
-      const userData = createPocketBaseUserData(email, username, password)
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Creating user in PocketBase', {
-        email: userData.email,
-        username: userData.username
-      });
-
-      const newUser = await pb.collection('users').create(userData)
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'User created successfully', {
-        userId: newUser.id
-      });
-
-      // Authenticate the newly created user
-      const authData = await pb.collection('users').authWithPassword(userData.email, password)
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'SignUp with auth successful', {
-        userId: authData.record.id,
-        hasToken: !!authData.token
-      });
-
-      const user = await convertPocketbaseUser(authData.record)
-      
-      set({
-        user,
-        session: authData,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null
-      })
-
-    } catch (error) {
-      debugLogger.error('[POCKETBASE_AUTH_STORE]', 'SignUp error', {
-        error,
-        stack: error instanceof Error ? error.stack : undefined
-      });
-
-      set({
-        error: handleSignUpError(error),
-        isLoading: false
-      })
+    debugLogger.info('[AUTH_STORE]', 'signUp - forcing local profile creation (server optional)')
+    const profile = await ensureLocalProfile()
+    await updateLocalProfile({ displayName: username })
+    const localUser: User = {
+      id: profile.deviceUserId,
+      email: email || 'local@device',
+      username: username || profile.displayName || 'You',
+      level: 1,
+      totalXp: 0,
+      coins: 0,
+      gems: 0,
+      createdAt: new Date(profile.createdAt).toISOString(),
+      lastActive: new Date().toISOString(),
+      preferences: {
+        theme: 'system',
+        language: 'en',
+        notifications: true,
+        soundEffects: true,
+        dailyGoal: 50,
+        timezone: 'UTC'
+      }
     }
-
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - signUp');
+    set({ user: localUser, session: null, isAuthenticated: true, isLoading: false, error: null })
   },
 
-  signIn: async (email: string, password: string) => {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'START - signIn', {
-      email,
-      passwordLength: password.length,
-      isDemoLogin: email === 'demo'
-    });
-
+  signIn: async (_email: string, _password: string) => {
+    // Force local login (server optional). Never calls PocketBase.
     set({ isLoading: true, error: null })
-    
-    const timeoutId = setTimeout(() => {
-      debugLogger.warn('[POCKETBASE_AUTH_STORE]', 'SignIn timeout reached');
-      set({ isLoading: false, error: 'Login timed out. Please try again.' })
-    }, 10000)
-    
-    try {
-      // Handle demo login in development
-      if (isDemoLogin(email, password)) {
-        debugLogger.info('[POCKETBASE_AUTH_STORE]', 'Demo login detected (development mode)');
-        const demoUser = createDemoUser()
-        
-        clearTimeout(timeoutId)
-        set({
-          user: demoUser,
-          session: null,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        })
-        
-        debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - signIn (demo user)');
-        return
+    debugLogger.info('[AUTH_STORE]', 'signIn - forcing local auth (server optional)')
+    const profile = await ensureLocalProfile()
+    const localUser: User = {
+      id: profile.deviceUserId,
+      email: 'local@device',
+      username: profile.displayName || 'You',
+      level: 1,
+      totalXp: 0,
+      coins: 0,
+      gems: 0,
+      createdAt: new Date(profile.createdAt).toISOString(),
+      lastActive: new Date().toISOString(),
+      preferences: {
+        theme: 'system',
+        language: 'en',
+        notifications: true,
+        soundEffects: true,
+        dailyGoal: 50,
+        timezone: 'UTC'
       }
-
-      // Validate inputs for regular login
-      validateSignInInputs(email, password)
-      
-      // Perform PocketBase authentication
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Attempting PocketBase authentication');
-      const authData = await performPocketBaseAuth(email, password)
-
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'SignIn response', {
-        hasRecord: !!authData.record,
-        hasToken: !!authData.token,
-        userId: authData.record?.id
-      });
-
-      if (authData.record && authData.token) {
-        debugLogger.log('[POCKETBASE_AUTH_STORE]', 'SignIn successful, converting user profile');
-        
-        const user = await convertPocketbaseUser(authData.record)
-        await updateUserLastActive(authData.record.id)
-        
-        clearTimeout(timeoutId)
-        
-        set({
-          user,
-          session: authData,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null
-        })
-        
-        debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - signIn (success)');
-      } else {
-        debugLogger.warn('[POCKETBASE_AUTH_STORE]', 'No user or token in response');
-        clearTimeout(timeoutId)
-        set({
-          error: 'Invalid login response - no user or token',
-          isLoading: false
-        })
-      }
-    } catch (error) {
-      debugLogger.error('[POCKETBASE_AUTH_STORE]', 'SignIn error', {
-        error,
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      
-      clearTimeout(timeoutId)
-      set({
-        error: handleSignInError(error),
-        isLoading: false
-      })
     }
-
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - signIn');
+    set({ user: localUser, session: null, isAuthenticated: true, isLoading: false, error: null })
+    useDeckStore.getState().setCurrentUser(localUser.id)
   },
 
   signOut: async () => {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'START - signOut');
+    debugLogger.log('[POCKETBASE]', 'START - signOut');
     
     try {
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Calling PocketBase authStore.clear');
+      debugLogger.log('[POCKETBASE]', 'Calling PocketBase authStore.clear');
       pb.authStore.clear()
       
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Clearing auth state');
-      set({ 
+      debugLogger.log('[POCKETBASE]', 'Clearing auth state');
+      set({
         user: null,
         session: null,
-        isAuthenticated: false, 
-        error: null 
+        isAuthenticated: false,
+        error: null
       })
+      useDeckStore.getState().setCurrentUser(null)
       
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - signOut (success)');
+      debugLogger.log('[POCKETBASE]', 'END - signOut (success)');
     } catch (error) {
-      debugLogger.error('[POCKETBASE_AUTH_STORE]', 'SignOut error', {
+      debugLogger.error('[POCKETBASE]', 'SignOut error', {
         error,
         stack: error instanceof Error ? error.stack : undefined
       });
@@ -398,7 +333,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   resetPassword: async (email: string) => {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'START - resetPassword', { email });
+    debugLogger.log('[POCKETBASE]', 'START - resetPassword', { email });
     
     set({ isLoading: true, error: null })
     
@@ -410,9 +345,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         error: null
       })
       
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - resetPassword (success)');
+      debugLogger.log('[POCKETBASE]', 'END - resetPassword (success)');
     } catch (error) {
-      debugLogger.error('[POCKETBASE_AUTH_STORE]', 'Reset password error', {
+      debugLogger.error('[POCKETBASE]', 'Reset password error', {
         error,
         stack: error instanceof Error ? error.stack : undefined
       });
@@ -436,12 +371,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   updatePassword: async (newPassword: string) => {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'START - updatePassword', {
+    debugLogger.log('[POCKETBASE]', 'START - updatePassword', {
       passwordLength: newPassword.length
     });
     
     const currentState = get();
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Current auth state', {
+    debugLogger.log('[POCKETBASE]', 'Current auth state', {
       hasUser: !!currentState.user,
       hasSession: !!currentState.session,
       isAuthenticated: currentState.isAuthenticated
@@ -459,25 +394,25 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         throw new Error('No authenticated user found');
       }
 
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Calling pb.collection.update');
+      debugLogger.log('[POCKETBASE]', 'Calling pb.collection.update');
 
       await pb.collection('users').update(currentState.user.id, {
         password: newPassword,
         passwordConfirm: newPassword
       });
 
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Password update successful');
+      debugLogger.log('[POCKETBASE]', 'Password update successful');
 
       set({ isLoading: false, error: null });
       
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - updatePassword (success)');
+      debugLogger.log('[POCKETBASE]', 'END - updatePassword (success)');
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
           : "An unknown error occurred during password update.";
       
-      debugLogger.error('[POCKETBASE_AUTH_STORE]', 'UpdatePassword failed', {
+      debugLogger.error('[POCKETBASE]', 'UpdatePassword failed', {
         error: errorMessage,
         errorType: error?.constructor?.name,
         stack: error instanceof Error ? error.stack : undefined
@@ -492,13 +427,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   updateProfile: async (updates: Partial<User>) => {
     const { user } = get()
     
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'START - updateProfile', {
+    debugLogger.log('[POCKETBASE]', 'START - updateProfile', {
       userId: user?.id,
       updates: Object.keys(updates)
     });
     
     if (!user) {
-      debugLogger.warn('[POCKETBASE_AUTH_STORE]', 'No user found for profile update');
+      debugLogger.warn('[POCKETBASE]', 'No user found for profile update');
       return
     }
     
@@ -513,16 +448,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         last_active: new Date().toISOString()
       };
       
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Updating profile in database', updateData);
+      debugLogger.log('[POCKETBASE]', 'Updating profile in database', updateData);
       
       await pb.collection('users').update(user.id, updateData)
       
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Updating local user state');
+      debugLogger.log('[POCKETBASE]', 'Updating local user state');
       set({ user: { ...user, ...updates } })
       
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - updateProfile (success)');
+      debugLogger.log('[POCKETBASE]', 'END - updateProfile (success)');
     } catch (error) {
-      debugLogger.error('[POCKETBASE_AUTH_STORE]', 'Profile update error', {
+      debugLogger.error('[POCKETBASE]', 'Profile update error', {
         error,
         stack: error instanceof Error ? error.stack : undefined
       });
@@ -534,23 +469,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   clearError: () => {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Clearing error state');
+    debugLogger.log('[POCKETBASE]', 'Clearing error state');
     set({ error: null })
   },
 
   initializeAuth: async () => {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'START - initializeAuth');
+    debugLogger.log('[POCKETBASE]', 'START - initializeAuth');
     
     try {
       if (pb.authStore.isValid && pb.authStore.model) {
-        debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Valid auth store found, converting user', {
+        debugLogger.log('[POCKETBASE]', 'Valid auth store found, converting user', {
           userId: pb.authStore.model.id,
           email: pb.authStore.model.email
         });
         
         const user = await convertPocketbaseUser(pb.authStore.model)
         
-        debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Setting authenticated state from initialization');
+        debugLogger.log('[POCKETBASE]', 'Setting authenticated state from initialization');
         set({
           user,
           session: {
@@ -560,33 +495,146 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           isAuthenticated: true
         })
       } else {
-        debugLogger.info('[POCKETBASE_AUTH_STORE]', 'No valid auth store found during initialization');
+        // Fallback: bootstrap a local-only profile (no server required)
+        debugLogger.info('[AUTH_STORE]', 'No remote session. Bootstrapping local profile.');
+        const profile = await ensureLocalProfile();
+        const localUser: User = {
+          id: profile.deviceUserId,
+          email: 'local@device',
+          username: profile.displayName || 'You',
+          level: 1,
+          totalXp: 0,
+          coins: 0,
+          gems: 0,
+          createdAt: new Date(profile.createdAt).toISOString(),
+          lastActive: new Date().toISOString(),
+          preferences: {
+            theme: 'system',
+            language: 'en',
+            notifications: true,
+            soundEffects: true,
+            dailyGoal: 50,
+            timezone: 'UTC'
+          }
+        };
+        set({
+          user: localUser,
+          session: null,
+          isAuthenticated: true
+        });
+        useDeckStore.getState().setCurrentUser(localUser.id);
+        debugLogger.log('[AUTH_STORE]', 'Local profile initialized', { deviceUserId: profile.deviceUserId });
       }
       
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'END - initializeAuth');
+      debugLogger.log('[POCKETBASE]', 'END - initializeAuth');
     } catch (error) {
-      debugLogger.error('[POCKETBASE_AUTH_STORE]', 'Auth initialization error', {
+      debugLogger.error('[POCKETBASE]', 'Auth initialization error', {
         error,
         stack: error instanceof Error ? error.stack : undefined
       });
       
-      set({ 
+      set({
         user: null,
         session: null,
-        isAuthenticated: false 
+        isAuthenticated: false
       })
     }
   },
 
-  // Unified methods for backward compatibility with existing components
-  login: async (email: string, password: string) => {
-    const { signIn } = get()
-    await signIn(email, password)
+  // Local account: optional online link helpers
+  connectOnline: async (provider, link) => {
+    const state = useAuthStore.getState();
+    const deviceUserId = state.user?.id;
+    if (!deviceUserId) {
+      debugLogger.warn('[AUTH_STORE]', 'connectOnline called without local user');
+      throw new Error('No local user');
+    }
+    await linkAccount({
+      deviceUserId,
+      provider,
+      serverUserId: link.serverUserId,
+      accessToken: link.accessToken,
+      refreshToken: link.refreshToken,
+      scopes: link.scopes,
+    });
+    debugLogger.info('[AUTH_STORE]', 'Online account linked', { provider });
   },
 
-  register: async (email: string, username: string, password: string) => {
-    const { signUp } = get()
-    await signUp(email, password, username)
+  disconnectOnline: async (provider) => {
+    const state = useAuthStore.getState();
+    const deviceUserId = state.user?.id;
+    if (!deviceUserId) return;
+    await unlinkAccount(deviceUserId, provider);
+    debugLogger.info('[AUTH_STORE]', 'Online account unlinked', { provider });
+  },
+
+  isOnlineLinked: async (provider) => {
+    const state = useAuthStore.getState();
+    const deviceUserId = state.user?.id;
+    if (!deviceUserId) return false;
+    return isLinked(deviceUserId, provider);
+  },
+
+  // Unified methods for components (FORCE LOCAL by default)
+  login: async (_email: string, _password: string) => {
+    debugLogger.info('[AUTH_STORE]', 'Login - forcing local auth (server optional)')
+    const profile = await ensureLocalProfile()
+    const localUser: User = {
+      id: profile.deviceUserId,
+      email: 'local@device',
+      username: profile.displayName || 'You',
+      level: 1,
+      totalXp: 0,
+      coins: 0,
+      gems: 0,
+      createdAt: new Date(profile.createdAt).toISOString(),
+      lastActive: new Date().toISOString(),
+      preferences: {
+        theme: 'system',
+        language: 'en',
+        notifications: true,
+        soundEffects: true,
+        dailyGoal: 50,
+        timezone: 'UTC'
+      }
+    }
+    set({ user: localUser, session: null, isAuthenticated: true, isLoading: false, error: null })
+  },
+
+  // Force local registration (server optional). Never calls PocketBase.
+  register: async (email: string, username: string, _password: string) => {
+    debugLogger.info('[AUTH_STORE]', 'Register - forcing local profile creation (server optional)')
+    const profile = await ensureLocalProfile()
+    // Persist desired display name locally
+    await updateLocalProfile({ displayName: username })
+    const localUser: User = {
+      id: profile.deviceUserId,
+      // Email is stored only for UX; not sent anywhere unless user links online features
+      email: email || 'local@device',
+      username: username || profile.displayName || 'You',
+      level: 1,
+      totalXp: 0,
+      coins: 0,
+      gems: 0,
+      createdAt: new Date(profile.createdAt).toISOString(),
+      lastActive: new Date().toISOString(),
+      preferences: {
+        theme: 'system',
+        language: 'en',
+        notifications: true,
+        soundEffects: true,
+        dailyGoal: 50,
+        timezone: 'UTC'
+      }
+    }
+    set({
+      user: localUser,
+      session: null,
+      isAuthenticated: true,
+      isLoading: false,
+      error: null
+    })
+    useDeckStore.getState().setCurrentUser(localUser.id)
   },
 
   logout: () => {
@@ -604,7 +652,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
 // Set up auth state change listener
 pb.authStore.onChange((token, record) => {
-  debugLogger.info('[POCKETBASE_AUTH_STORE]', 'Auth state change detected', {
+  debugLogger.info('[POCKETBASE]', 'Auth state change detected', {
     hasToken: !!token,
     hasRecord: !!record,
     userId: record?.id,
@@ -612,23 +660,24 @@ pb.authStore.onChange((token, record) => {
   });
   
   if (token && record) {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Processing auth state change - user logged in');
+    debugLogger.log('[POCKETBASE]', 'Processing auth state change - user logged in');
     
     convertPocketbaseUser(record).then(user => {
-      debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Updating auth store for logged in user');
+      debugLogger.log('[POCKETBASE]', 'Updating auth store for logged in user');
       useAuthStore.setState({
         user,
         session: { record, token },
         isAuthenticated: true
       })
+      useDeckStore.getState().setCurrentUser(user.id)
     }).catch(error => {
-      debugLogger.error('[POCKETBASE_AUTH_STORE]', 'Failed to convert user during auth change', {
+      debugLogger.error('[POCKETBASE]', 'Failed to convert user during auth change', {
         error,
         userId: record.id
       });
     });
   } else {
-    debugLogger.log('[POCKETBASE_AUTH_STORE]', 'Processing auth state change - user logged out');
+    debugLogger.log('[POCKETBASE]', 'Processing auth state change - user logged out');
     
     useAuthStore.setState({
       user: null,

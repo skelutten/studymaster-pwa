@@ -477,6 +477,7 @@ const StudyPage = () => {
             <CardRenderer
               card={currentCard}
               showAnswer={showAnswer}
+              deckId={deckId}
             />
 
             {!showAnswer ? (

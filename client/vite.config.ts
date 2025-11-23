@@ -38,7 +38,8 @@ export default defineConfig({
     ] : []),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      // Ensure icon assets are precached to avoid Workbox "no-response" when offline on first load
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'icons/*', 'screenshots/*'],
       manifest: {
         name: 'StudyMaster - Flashcard Learning App',
         short_name: 'StudyMaster',
@@ -49,45 +50,18 @@ export default defineConfig({
         scope: '/',
         start_url: '/',
         icons: [
+          // Use existing public asset to avoid 404s during Workbox precache
           {
-            src: 'icons/icon-72x72.png',
-            sizes: '72x72',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-96x96.png',
-            sizes: '96x96',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-128x128.png',
-            sizes: '128x128',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-144x144.png',
-            sizes: '144x144',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-152x152.png',
-            sizes: '152x152',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-192x192.png',
+            src: 'apple-touch-icon.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           },
           {
-            src: 'icons/icon-384x384.png',
-            sizes: '384x384',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-512x512.png',
+            src: 'apple-touch-icon.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       },
@@ -137,6 +111,33 @@ export default defineConfig({
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+              }
+            }
+          },
+          // Queue POST submissions reliably even when offline
+          {
+            urlPattern: /\/api\/leaderboard\/submit/i,
+            handler: 'NetworkOnly',
+            method: 'POST',
+            options: {
+              backgroundSync: {
+                name: 'leaderboard-queue',
+                options: {
+                  maxRetentionTime: 60 // retry for up to 1 minute
+                }
+              }
+            }
+          },
+          // Cache GET leaderboard reads with NetworkFirst
+          {
+            urlPattern: /\/api\/leaderboard\/?.*/i,
+            handler: 'NetworkFirst',
+            method: 'GET',
+            options: {
+              cacheName: 'leaderboard-api',
+              expiration: {
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 10 // 10 minutes
               }
             }
           },

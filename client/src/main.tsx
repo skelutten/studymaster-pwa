@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
+import { initSyncQueueFlusher } from './services/syncQueueFlusher'
 
 // Initialize performance monitoring if enabled
 if (import.meta.env.VITE_WEB_VITALS_ENABLED === 'true') {
@@ -27,6 +28,9 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// Initialize offline sync queue flusher (fallback when SW Background Sync unavailable)
+initSyncQueueFlusher()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
