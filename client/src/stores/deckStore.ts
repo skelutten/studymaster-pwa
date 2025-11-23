@@ -5,6 +5,9 @@ import { createNewCard } from '../utils/cardDefaults'
 
 import { repos } from '../data'
 import { buildNewDeckFromDomain, buildNewCardFromDomain, mapDeckUpdatesToRepo } from '../data/mappers/domainMappers'
+import { useAuthStore } from './authStore'
+import { mediaStorage } from '../services/mediaStorageService'
+import { getMediaContextService } from '../services/anki/MediaContextService'
 interface StudySession {
   deckId: string
   currentCardIndex: number
@@ -26,6 +29,8 @@ interface DeckStore {
   error: string | null
   importProgress: number // 0-100
   importStatus: string | null
+  hydrated: boolean
+  currentUserId: string | null
   
   // Deck operations
   createDeck: (deck: Omit<Deck, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Deck>
@@ -40,6 +45,7 @@ interface DeckStore {
   createDeckBulk: (deck: Omit<Deck, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Deck>
   updateCard: (cardId: string, updates: Partial<Card>) => Promise<void>
   deleteCard: (cardId: string) => Promise<void>
+  deleteCardsBatch: (deckId: string, cardIds: string[]) => Promise<void>
   getCards: (deckId: string) => Card[]
   
   // Import operations
@@ -48,6 +54,7 @@ interface DeckStore {
   
   // Example data
   loadExampleDecks: () => Promise<void>
+  hydrateFromIndexedDB: () => Promise<void>
   
   // Utility
   clearError: () => void
@@ -55,6 +62,8 @@ interface DeckStore {
   setImportProgress: (progress: number, status?: string) => void
   resetImportProgress: () => void
   removeDuplicateCards: (deckId: string) => Promise<number>
+  setCurrentUser: (userId: string | null) => void
+  getUserDecks: () => Deck[]
   
   // Study session functions
   startStudySession: (deckId: string, studyCards: Card[]) => void
@@ -101,15 +110,25 @@ async function persistAddCard(deckId: string, card: Card) {
   }
 }
 
-// Helper function to clean field content
+// Helper function to clean field content (preserve HTML for media rendering)
 const cleanFieldContent = (content: string): string => {
   return content
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&')
-    .replace(/\[sound:[^\]]*\]/g, '') // Remove sound references
+    .trim()
+}
+
+// Helper to extract plain text for detection (no HTML)
+const extractPlainText = (content: string): string => {
+  return content
+    .replace(/<[^>]*>/g, '')
+    .replace(/\[sound:[^\]]*\]/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
     .trim()
 }
 
@@ -129,8 +148,8 @@ const detectBestFieldCombination = (sampleFields: string[][]): { frontIndex: num
       let validPairs = 0
       
       for (const fields of sampleFields) {
-        const frontContent = cleanFieldContent(fields[front] || '')
-        const backContent = cleanFieldContent(fields[back] || '')
+        const frontContent = extractPlainText(fields[front] || '')
+        const backContent = extractPlainText(fields[back] || '')
         
         // Score based on content quality
         if (frontContent && backContent) {
@@ -179,7 +198,34 @@ const detectBestFieldCombination = (sampleFields: string[][]): { frontIndex: num
 }
 
 // Helper function to parse .apkg files (with dynamic imports for bundle optimization)
-const parseApkgFile = async (file: File): Promise<{ name: string; cards: Array<{ front: string; back: string }> }> => {
+interface MediaFile {
+  filename: string
+  data: Blob
+}
+
+// Helper to determine MIME type from filename extension
+const getMimeTypeFromFilename = (filename: string): string => {
+  const ext = filename.toLowerCase().split('.').pop() || ''
+  const mimeTypes: Record<string, string> = {
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'svg': 'image/svg+xml',
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'mp4': 'video/mp4',
+    'webm': 'video/webm'
+  }
+  return mimeTypes[ext] || 'application/octet-stream'
+}
+
+const parseApkgFile = async (file: File): Promise<{
+  name: string
+  cards: Array<{ front: string; back: string }>
+  mediaFiles: MediaFile[]
+}> => {
   try {
     // Dynamic imports to reduce initial bundle size
     const [{ default: JSZip }, { default: initSqlJs }] = await Promise.all([
@@ -272,13 +318,61 @@ const parseApkgFile = async (file: File): Promise<{ name: string; cards: Array<{
     }
     
     db.close()
-    
+
     if (cards.length === 0) {
       throw new Error('No valid cards found in the .apkg file')
     }
-    
-    console.log(`Successfully parsed ${cards.length} cards from .apkg file`)
-    return { name: deckName, cards }
+
+    // Extract media files from the zip
+    // Anki stores media with numeric filenames (0, 1, 2...) and a 'media' JSON mapping file
+    const mediaFiles: MediaFile[] = []
+
+    // First, get the media mapping (maps numeric IDs to original filenames)
+    const mediaMapFile = zipContent.file('media')
+    let mediaMap: Record<string, string> = {}
+
+    if (mediaMapFile) {
+      try {
+        const mediaMapText = await mediaMapFile.async('text')
+        mediaMap = JSON.parse(mediaMapText)
+        console.log(`Found media mapping with ${Object.keys(mediaMap).length} entries`)
+      } catch (err) {
+        console.warn('Failed to parse media mapping:', err)
+      }
+    }
+
+    // Extract all media files (numeric filenames at root level)
+    for (const [filename, zipEntry] of Object.entries(zipContent.files)) {
+      // Skip directories, collection.anki2, and media mapping file
+      if (zipEntry.dir || filename === 'collection.anki2' || filename === 'media') {
+        continue
+      }
+
+      // Check if this is a numeric media file or has a media extension
+      const isNumericMedia = /^\d+$/.test(filename)
+      const hasMediaExt = /\.(jpg|jpeg|png|gif|svg|mp3|wav|ogg|mp4|webm)$/i.test(filename)
+
+      if (isNumericMedia || hasMediaExt) {
+        try {
+          const blob = await zipEntry.async('blob')
+
+          // Use mapped filename if available, otherwise use the file's actual name
+          const originalFilename = mediaMap[filename] || filename
+
+          mediaFiles.push({
+            filename: originalFilename,
+            data: blob
+          })
+
+          console.log(`Extracted media: ${filename} -> ${originalFilename} (${blob.size} bytes)`)
+        } catch (err) {
+          console.warn(`Failed to extract media file: ${filename}`, err)
+        }
+      }
+    }
+
+    console.log(`Successfully parsed ${cards.length} cards and ${mediaFiles.length} media files from .apkg`)
+    return { name: deckName, cards, mediaFiles }
   } catch (error) {
     console.error('Error parsing .apkg file:', error)
     throw new Error(`Failed to parse .apkg file: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -295,12 +389,18 @@ export const useDeckStore = create<DeckStore>()(
       error: null,
       importProgress: 0,
       importStatus: null,
-
+      hydrated: false,
+      currentUserId: null,
+ 
       createDeck: async (deckData) => {
         set({ isLoading: true, error: null })
         try {
+          const { user } = useAuthStore.getState()
+          const userId = user?.id || 'local-user'
+
           const deck: Deck = {
             ...deckData,
+            userId,
             id: crypto.randomUUID(),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -482,8 +582,12 @@ export const useDeckStore = create<DeckStore>()(
 
       createDeckBulk: async (deckData) => {
         try {
+          const { user } = useAuthStore.getState()
+          const userId = user?.id || 'local-user'
+
           const deck: Deck = {
             ...deckData,
+            userId,
             id: crypto.randomUUID(),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -621,6 +725,41 @@ export const useDeckStore = create<DeckStore>()(
         }
       },
 
+      deleteCardsBatch: async (deckId, cardIds) => {
+        set({ isLoading: true, error: null })
+        try {
+          set(state => {
+            const newCards = { ...state.cards }
+            const currentDeckCards = newCards[deckId] || []
+            const updatedDeckCards = currentDeckCards.filter(card => !cardIds.includes(card.id))
+            
+            newCards[deckId] = updatedDeckCards
+            
+            return {
+              cards: newCards,
+              decks: state.decks.map(deck =>
+                deck.id === deckId
+                  ? { ...deck, cardCount: updatedDeckCards.length, updatedAt: new Date().toISOString() }
+                  : deck
+              ),
+              isLoading: false
+            }
+          })
+
+          // Persist deletes (non-blocking)
+          for (const cardId of cardIds) {
+            try {
+              void repos.cards.remove(cardId)
+            } catch (e) {
+              console.warn(`[deckStore] repo deleteCardsBatch failed for card ${cardId}`, e)
+            }
+          }
+        } catch (error) {
+          set({ error: 'Failed to delete cards in batch', isLoading: false })
+          throw error
+        }
+      },
+
       getCards: (deckId) => {
         return get().cards[deckId] || []
       },
@@ -638,19 +777,23 @@ export const useDeckStore = create<DeckStore>()(
             setImportProgress(10, 'Reading file...')
             
             // Parse .apkg file using the new parser
-            const { name, cards } = await parseApkgFile(file)
+            const { name, cards, mediaFiles } = await parseApkgFile(file)
 
-            // Check if deck with the same name already exists
-            const existingDeck = get().decks.find(d => d.title === name);
+            console.log(`Parsed .apkg: ${name} with ${cards.length} cards and ${mediaFiles.length} media files`)
+
+            // Check if deck with the same name already exists for the current user
+            const { user } = useAuthStore.getState()
+            const userId = user?.id || 'local-user'
+            const existingDeck = get().decks.find(d => d.title === name && d.userId === userId);
             if (existingDeck) {
               throw new Error(`A deck named "${name}" already exists. Please rename the deck or the file before importing.`);
             }
             
             setImportProgress(30, 'Creating deck...')
-            
+
             // Create deck
             const deck = await get().createDeckBulk({
-              userId: 'current-user',
+              userId,
               title: name,
               description: `Imported Anki deck with ${cards.length} cards`,
               cardCount: 0,
@@ -658,7 +801,62 @@ export const useDeckStore = create<DeckStore>()(
               settings: defaultDeckSettings,
               category: 'imported'
             })
-            
+
+            // Store media files and build mappings
+            if (mediaFiles.length > 0) {
+              console.log(`[IMPORT] Starting media storage for ${mediaFiles.length} files`)
+              setImportProgress(35, `Storing ${mediaFiles.length} media files...`)
+
+              const mediaContextService = getMediaContextService()
+              const storedMediaFiles: Array<{
+                id: string
+                originalFilename: string
+                filename: string
+                mimeType: string
+                blob?: Blob
+              }> = []
+
+              for (let i = 0; i < mediaFiles.length; i++) {
+                const mediaFile = mediaFiles[i]
+                try {
+                  // Determine MIME type from filename
+                  const mimeType = mediaFile.data.type || getMimeTypeFromFilename(mediaFile.filename)
+
+                  console.log(`[IMPORT] Storing media ${i + 1}/${mediaFiles.length}: ${mediaFile.filename} (${mimeType}, ${mediaFile.data.size} bytes)`)
+
+                  // Store blob in media repository
+                  const mediaHash = await mediaStorage.storeBlob(mediaFile.data, mimeType)
+
+                  console.log(`[IMPORT] Stored ${mediaFile.filename} with hash: ${mediaHash}`)
+
+                  // Create media file record for mapping
+                  storedMediaFiles.push({
+                    id: mediaHash,
+                    originalFilename: mediaFile.filename,
+                    filename: mediaFile.filename,
+                    mimeType,
+                    blob: mediaFile.data
+                  })
+
+                  if (i % 10 === 0) {
+                    setImportProgress(35 + (5 * i / mediaFiles.length), `Stored ${i}/${mediaFiles.length} media files...`)
+                  }
+                } catch (err) {
+                  console.error(`[IMPORT] Failed to store media file: ${mediaFile.filename}`, err)
+                }
+              }
+
+              console.log(`[IMPORT] Stored ${storedMediaFiles.length} media files, building mappings for deck ${deck.id}`)
+
+              // Build media mappings
+              await mediaContextService.buildMappingsFromImport(deck.id, storedMediaFiles, userId)
+
+              console.log(`[IMPORT] Built media mappings for deck ${deck.id}`)
+              console.log(`[IMPORT] MediaContext mappings count:`, (mediaContextService as any).urlMappings.get(deck.id)?.size || 0)
+            } else {
+              console.log(`[IMPORT] No media files found in .apkg`)
+            }
+
             setImportProgress(40, `Importing ${cards.length} cards...`)
             
             // Remove duplicates from cards before batch processing
@@ -827,8 +1025,11 @@ export const useDeckStore = create<DeckStore>()(
           
           setImportProgress(40, 'Creating deck...')
           
+          const { user } = useAuthStore.getState()
+          const userId = user?.id || 'local-user'
+
           const deck = await get().createDeckBulk({
-            userId: 'current-user', // This would come from auth store
+            userId,
             title: deckName,
             description: `Imported deck with ${lines.length} cards`,
             cardCount: 0,
@@ -1033,9 +1234,12 @@ export const useDeckStore = create<DeckStore>()(
           ]
 
           console.log('Loading example decks...')
+          const { user } = useAuthStore.getState()
+          const userId = user?.id || 'local-user'
+
           for (const deckData of exampleDecks) {
             const deck = await get().createDeck({
-              userId: 'current-user',
+              userId,
               title: deckData.title,
               description: deckData.description,
               cardCount: 0,
@@ -1113,7 +1317,120 @@ export const useDeckStore = create<DeckStore>()(
 
       setImportProgress: (progress, status) => set({ importProgress: progress, importStatus: status }),
       resetImportProgress: () => set({ importProgress: 0, importStatus: null }),
+      
+      // Hydrate in-memory store from IndexedDB (decks + cards)
+      hydrateFromIndexedDB: async () => {
+        const state = get();
+        if (state.hydrated) return;
+        set({ isLoading: true });
+        try {
+          // Load decks
+          const deckRows = await repos.decks.list();
+          const cardsByDeck: Record<string, Card[]> = {};
 
+          // Load cards per deck and map to domain Card
+          for (const d of deckRows) {
+            const rows = await repos.cards.listByDeck(d.deckId);
+            const cards: Card[] = rows.map((r) => {
+              const nowIso = new Date().toISOString();
+              const createdIso = new Date(r.createdAt).toISOString?.() ?? nowIso;
+              const dueDay = r.dueAt ? Math.floor(r.dueAt / 86400000) : Math.floor(Date.now() / 86400000);
+              return {
+                id: r.cardId,
+                deckId: r.deckId,
+                frontContent: String((r.fields as any)?.front ?? ''),
+                backContent: String((r.fields as any)?.back ?? ''),
+                cardType: { type: 'basic' },
+                mediaRefs: [],
+
+                // Legacy/simple scheduling fields used by some UI stats
+                easeFactor: typeof r.ease === 'number' ? (r.ease / 100) : 2.5,
+                intervalDays: r.interval ?? 0,
+                nextReview: r.dueAt ? new Date(r.dueAt).toISOString() : nowIso,
+                createdAt: createdIso,
+                reviewCount: 0,
+                lapseCount: r.lapses ?? 0,
+
+                // Enhanced Anki-style fields (best-effort defaults)
+                state: (r.state as Card['state']) ?? 'new',
+                queue: 0,
+                due: dueDay,
+                ivl: r.interval ?? 0,
+                factor: typeof r.ease === 'number' ? r.ease : 250,
+                reps: 0,
+                lapses: r.lapses ?? 0,
+                left: 0,
+
+                learningStep: 0,
+                graduationInterval: 0,
+                easyInterval: 0,
+
+                totalStudyTime: 0,
+                averageAnswerTime: 0,
+                flags: 0,
+                originalDue: 0,
+                originalDeck: r.deckId,
+                xpAwarded: 0,
+                difficultyRating: 0,
+              };
+            });
+            cardsByDeck[d.deckId] = cards;
+          }
+
+          // Get current userId for migration (wait for it to be set by authStore)
+          const currentUserId = state.currentUserId || useAuthStore.getState().user?.id || 'local-user';
+
+          // Map decks to domain Deck and migrate userId
+          const decks: Deck[] = [];
+          for (const d of deckRows) {
+            const meta = (d.meta ?? {}) as any;
+            const deckUserId = meta.userId ?? currentUserId;
+
+            // If userId was migrated, update in repository (async, non-blocking)
+            if (!meta.userId && deckUserId) {
+              const updatedMeta = { ...meta, userId: deckUserId };
+              // Only update if deck still exists
+              repos.decks.get(d.deckId).then(existing => {
+                if (existing) {
+                  return repos.decks.update(d.deckId, { meta: updatedMeta });
+                }
+              }).catch(err => {
+                // Silently ignore "Deck not found" errors (deck was deleted)
+                if (!err.message?.includes('Deck not found')) {
+                  console.warn('[deckStore] Failed to migrate userId for deck', d.deckId, err);
+                }
+              });
+            }
+
+            decks.push({
+              id: d.deckId,
+              userId: deckUserId,
+              title: d.name,
+              description: d.description ?? '',
+              cardCount: (cardsByDeck[d.deckId]?.length ?? d.cardCount ?? 0),
+              isPublic: meta.isPublic ?? false,
+              settings: meta.settings ?? { ...defaultDeckSettings },
+              advancedSettings: meta.advancedSettings,
+              createdAt: new Date(d.createdAt).toISOString(),
+              updatedAt: new Date(d.updatedAt).toISOString(),
+              tags: meta.tags ?? [],
+              category: meta.category ?? undefined,
+            });
+          }
+
+          set({
+            decks,
+            cards: cardsByDeck,
+            hydrated: true,
+            isLoading: false,
+            error: null,
+          });
+        } catch (e) {
+          console.warn('[deckStore] hydrateFromIndexedDB failed', e);
+          set({ hydrated: true, isLoading: false, error: 'Failed to load local data' });
+        }
+      },
+ 
       // Study session functions
             startStudySession: (deckId, studyCards) => {
         const studyCardIds = studyCards.map(c => c.id);
@@ -1157,7 +1474,7 @@ export const useDeckStore = create<DeckStore>()(
         set(state => {
           // Reset all card progress data
           const resetCards: Record<string, Card[]> = {}
-          
+
           for (const [deckId, cards] of Object.entries(state.cards)) {
             resetCards[deckId] = cards.map(card => ({
               ...card,
@@ -1168,12 +1485,22 @@ export const useDeckStore = create<DeckStore>()(
               lapseCount: 0
             }))
           }
-          
+
           return {
             cards: resetCards,
             currentStudySession: null
           }
         })
+      },
+
+      setCurrentUser: (userId: string | null) => {
+        set({ currentUserId: userId })
+      },
+
+      getUserDecks: () => {
+        const state = get()
+        if (!state.currentUserId) return []
+        return state.decks.filter(deck => deck.userId === state.currentUserId)
       }
     }),
     {
